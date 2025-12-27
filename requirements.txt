@@ -9,7 +9,7 @@ llama-index-graph-stores-neo4j>=0.4.0
 
 # LLM Integration
 openai==1.57.4
-google-generativeai==0.8.3
+google-genai>=1.56.0
 anthropic==0.42.0  # Optional
 
 # Utilities

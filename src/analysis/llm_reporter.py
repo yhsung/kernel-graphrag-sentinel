@@ -48,17 +48,16 @@ class LLMReporter:
     def _init_gemini(self):
         """Initialize Google Gemini client."""
         try:
-            import google.generativeai as genai
+            from google import genai
 
             api_key = self.config.api_key or os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError("Gemini API key not found. Set GEMINI_API_KEY environment variable.")
 
-            genai.configure(api_key=api_key)
-            self.client = genai.GenerativeModel(self.config.model)
+            self.client = genai.Client(api_key=api_key)
             logger.info(f"Initialized Gemini client with model: {self.config.model}")
         except ImportError:
-            raise ImportError("google-generativeai not installed. Run: pip install google-generativeai")
+            raise ImportError("google-genai not installed. Run: pip install google-genai")
 
     def _init_openai(self):
         """Initialize OpenAI client."""
@@ -212,13 +211,16 @@ Report:"""
     def _call_gemini(self, prompt: str) -> str:
         """Call Google Gemini API."""
         try:
+            from google import genai
+
             # Gemini 2.0/3.0 Flash supports up to 8192 output tokens
-            response = self.client.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": self.config.temperature,
-                    "max_output_tokens": 8192,
-                }
+            response = self.client.models.generate_content(
+                model=self.config.model,
+                contents=prompt,
+                config=genai.GenerateContentConfig(
+                    temperature=self.config.temperature,
+                    max_output_tokens=8192,
+                )
             )
             return response.text
         except Exception as e:
