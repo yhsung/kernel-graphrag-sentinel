@@ -4,7 +4,28 @@ This directory contains example configurations, LLM-generated reports, and query
 
 ---
 
-## 📁 Directory Contents
+## 📁 Directory Structure
+
+```
+examples/
+├── README.md                    # This file - comprehensive documentation index
+├── analyze_ext4.yaml            # Example configuration for ext4 analysis
+├── query_examples.md            # 30+ Neo4j Cypher query examples
+└── reports/                     # LLM-generated and rule-based reports
+    ├── rule-based-report.md              # Non-LLM baseline (38 lines)
+    ├── anthropic-claude-haiku-4-5-report.md  # Anthropic (203 lines)
+    ├── openai-gpt5-nano-report.md        # OpenAI Nano (120 lines)
+    ├── openai-gpt5-mini-report.md        # OpenAI Mini (171 lines)
+    ├── openai-gpt5.2-report.md           # OpenAI 5.2 (156 lines)
+    ├── gemini-3.0-flash-report.md        # Gemini Flash (43 lines)
+    ├── gemini-3.0-pro-report.md          # Gemini 3.0 Pro (74 lines)
+    ├── gemini-2.5-pro-report.md          # Gemini 2.5 Pro (88 lines)
+    └── qwen3-vl-30b-report.md            # Ollama (150 lines)
+```
+
+---
+
+## 📄 File Descriptions
 
 ### Configuration Examples
 
@@ -29,7 +50,9 @@ python3 src/main.py --config examples/analyze_ext4.yaml pipeline fs/ext4
 
 All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) to demonstrate differences between LLM providers.
 
-#### 0. `rule-based-report.md` (Non-LLM Baseline)
+**Location:** All reports are in `examples/reports/` directory
+
+#### 0. `reports/rule-based-report.md` (Non-LLM Baseline)
 **Provider:** Built-in analyzer (no LLM)
 **Report Length:** 38 lines
 **Generation Time:** <1 second
@@ -46,7 +69,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 1. `anthropic-claude-haiku-4-5-report.md` ⭐ Recommended
+#### 1. `reports/anthropic-claude-haiku-4-5-report.md` ⭐ Recommended
 **Provider:** Anthropic Claude
 **Model:** claude-haiku-4-5
 **Report Length:** 203 lines
@@ -64,7 +87,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 2. `openai-gpt5-nano-report.md`
+#### 2. `reports/openai-gpt5-nano-report.md`
 **Provider:** OpenAI
 **Model:** gpt-5-nano-2025-08-07 (reasoning model)
 **Report Length:** 120 lines
@@ -83,7 +106,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 2a. `openai-gpt5-mini-report.md`
+#### 2a. `reports/openai-gpt5-mini-report.md`
 **Provider:** OpenAI
 **Model:** gpt-5-mini (reasoning model)
 **Report Length:** 171 lines
@@ -103,7 +126,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 2b. `openai-gpt5.2-report.md`
+#### 2b. `reports/openai-gpt5.2-report.md`
 **Provider:** OpenAI
 **Model:** gpt-5.2 (latest reasoning model)
 **Report Length:** 156 lines
@@ -123,7 +146,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 3. `gemini-3.0-flash-report.md`
+#### 3. `reports/gemini-3.0-flash-report.md`
 **Provider:** Google Gemini
 **Model:** gemini-3-flash-preview
 **Report Length:** 43 lines
@@ -140,7 +163,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 4. `gemini-3.0-pro-report.md`
+#### 4. `reports/gemini-3.0-pro-report.md`
 **Provider:** Google Gemini
 **Model:** gemini-3.0-pro-preview
 **Report Length:** 74 lines
@@ -157,7 +180,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 5. `gemini-2.5-pro-report.md`
+#### 5. `reports/gemini-2.5-pro-report.md`
 **Provider:** Google Gemini
 **Model:** gemini-2.5-pro-preview (experimental)
 **Report Length:** 88 lines
@@ -174,7 +197,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 6. `qwen3-vl-30b-report.md`
+#### 6. `reports/qwen3-vl-30b-report.md`
 **Provider:** Ollama (Local)
 **Model:** qwen3-vl:30b
 **Report Length:** 150+ lines
