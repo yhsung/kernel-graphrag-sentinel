@@ -10,6 +10,16 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
 import logging
 
+# Load .env file if it exists
+try:
+    from dotenv import load_dotenv
+    # Look for .env in project root
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path, override=True)  # Override existing env vars
+except ImportError:
+    pass  # python-dotenv not installed, use existing environment
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,10 +130,23 @@ class Config:
 
         # LLM configuration
         llm_data = data.get('llm', {})
+        provider = llm_data.get('provider', os.getenv('LLM_PROVIDER', 'openai'))
+
+        # Get API key based on provider
+        if provider == 'gemini':
+            default_key = os.getenv('GEMINI_API_KEY')
+            default_model = llm_data.get('model', os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp'))
+        elif provider == 'anthropic':
+            default_key = os.getenv('ANTHROPIC_API_KEY')
+            default_model = llm_data.get('model', os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'))
+        else:  # openai or default
+            default_key = os.getenv('OPENAI_API_KEY')
+            default_model = llm_data.get('model', os.getenv('OPENAI_MODEL', 'gpt-4'))
+
         llm = LLMConfig(
-            provider=llm_data.get('provider', 'openai'),
-            model=llm_data.get('model', 'gpt-4'),
-            api_key=llm_data.get('api_key', os.getenv('OPENAI_API_KEY')),
+            provider=provider,
+            model=default_model,
+            api_key=llm_data.get('api_key', default_key),
             temperature=llm_data.get('temperature', 0.7)
         )
 
@@ -153,12 +176,43 @@ class Config:
             subsystem=subsystem or 'fs/ext4'
         )
 
+        # Load LLM config from environment
+        provider = os.getenv('LLM_PROVIDER', 'openai')
+        if provider == 'gemini':
+            llm_config = LLMConfig(
+                provider='gemini',
+                model=os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp'),
+                api_key=os.getenv('GEMINI_API_KEY'),
+                temperature=0.7
+            )
+        elif provider == 'anthropic':
+            llm_config = LLMConfig(
+                provider='anthropic',
+                model=os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'),
+                api_key=os.getenv('ANTHROPIC_API_KEY'),
+                temperature=0.7
+            )
+        elif provider == 'ollama':
+            llm_config = LLMConfig(
+                provider='ollama',
+                model=os.getenv('OLLAMA_MODEL', 'llama3'),
+                api_key=None,  # Ollama doesn't need API key
+                temperature=0.7
+            )
+        else:  # openai or unknown
+            llm_config = LLMConfig(
+                provider='openai',
+                model=os.getenv('OPENAI_MODEL', 'gpt-4'),
+                api_key=os.getenv('OPENAI_API_KEY'),
+                temperature=0.7
+            )
+
         return cls(
             kernel=kernel,
             neo4j=Neo4jConfig(),
             preprocessing=PreprocessingConfig(),
             analysis=AnalysisConfig(),
-            llm=LLMConfig()
+            llm=llm_config
         )
 
     def to_dict(self) -> Dict[str, Any]:

@@ -150,8 +150,10 @@ def map_tests(ctx, subsystem):
               help='Maximum call chain depth to analyze')
 @click.option('--output', '-o', type=click.File('w'),
               help='Output file for report (default: stdout)')
+@click.option('--llm', is_flag=True,
+              help='Generate AI-powered natural language report using LLM')
 @click.pass_context
-def analyze(ctx, function_name, max_depth, output):
+def analyze(ctx, function_name, max_depth, output, llm):
     """
     Analyze the impact of modifying a function.
 
@@ -164,11 +166,15 @@ def analyze(ctx, function_name, max_depth, output):
         kgraph analyze ext4_mb_new_blocks_simple --max-depth 5
 
         kgraph analyze ext4_inode_bitmap --output report.txt
+
+        kgraph analyze ext4_map_blocks --llm  # AI-powered report
     """
     config = ctx.obj['config']
 
     click.echo(f"Analyzing impact for: {function_name}")
     click.echo(f"Max call depth: {max_depth}")
+    if llm:
+        click.echo(f"LLM provider: {config.llm.provider} ({config.llm.model})")
 
     with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
                           config.neo4j.password) as store:
@@ -181,7 +187,43 @@ def analyze(ctx, function_name, max_depth, output):
         )
 
         if impact:
-            report = analyzer.format_impact_report(impact, max_items=15)
+            # Generate LLM report if requested
+            if llm:
+                try:
+                    from src.analysis.llm_reporter import LLMReporter, LLMConfig
+
+                    click.echo("\n🤖 Generating AI-powered report...")
+
+                    llm_config = LLMConfig(
+                        provider=config.llm.provider,
+                        model=config.llm.model,
+                        api_key=config.llm.api_key,
+                        temperature=config.llm.temperature
+                    )
+
+                    reporter = LLMReporter(llm_config)
+
+                    # Convert ImpactResult to dict
+                    impact_data = {
+                        "file_path": impact.target_file,
+                        "stats": impact.stats,
+                        "direct_callers": impact.direct_callers,
+                        "indirect_callers": impact.indirect_callers,
+                        "direct_callees": impact.direct_callees,
+                        "indirect_callees": impact.indirect_callees,
+                        "direct_tests": impact.direct_tests,
+                        "indirect_tests": impact.indirect_tests,
+                        "risk_level": impact.stats.get('risk_level', 'UNKNOWN')
+                    }
+
+                    report = reporter.generate_impact_report(impact_data, function_name)
+
+                except Exception as e:
+                    click.echo(f"\n❌ LLM report generation failed: {e}")
+                    click.echo("\nFalling back to standard report...\n")
+                    report = analyzer.format_impact_report(impact, max_items=15)
+            else:
+                report = analyzer.format_impact_report(impact, max_items=15)
 
             if output:
                 output.write(report)
