@@ -15,11 +15,13 @@ Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kerne
 - **📊 Call Graph Analysis**: Multi-hop function call chain traversal (up to N hops)
 - **🧪 Test Coverage Mapping**: Automatic KUnit test-to-function mapping
 - **🔍 Impact Assessment**: Analyze the impact of modifying any kernel function
+- **🤖 LLM-Powered Reports**: AI-generated natural language impact analysis (Gemini, OpenAI, Anthropic, Ollama)
 - **⚡ Risk Evaluation**: Identify critical uncovered functions
-- **🌳 Tree-sitter Parsing**: Accurate C code AST extraction
+- **🌳 Tree-sitter Parsing**: Accurate C code AST extraction with macro preprocessing
 - **🗄️ Neo4j Graph Database**: Efficient storage and querying of code relationships
 - **🖥️ CLI Interface**: User-friendly command-line tool
 - **📝 YAML Configuration**: Flexible configuration management
+- **🔧 Subsystem Auto-detection**: Automatic detection of kernel subsystem boundaries
 
 ---
 
@@ -174,12 +176,20 @@ python3 src/main.py map-tests fs/ext4
 Comprehensive impact analysis for any function:
 
 ```bash
+# Standard impact analysis
 python3 src/main.py analyze ext4_map_blocks
+
+# Deeper analysis (up to 5 hops)
 python3 src/main.py analyze ext4_mb_new_blocks_simple --max-depth 5
+
+# Save to file
 python3 src/main.py analyze ext4_inode_bitmap --output report.txt
+
+# AI-powered natural language report (requires LLM configuration)
+python3 src/main.py analyze ext4_file_write_iter --llm
 ```
 
-**Output:**
+**Standard Output:**
 ```
 IMPACT ANALYSIS: ext4_map_blocks
 ================================================================================
@@ -194,6 +204,34 @@ SUMMARY
 
 RISK ASSESSMENT
   Risk Level: MEDIUM-HIGH (widely used, limited test coverage)
+```
+
+**LLM-Powered Output:**
+```
+🤖 Generating AI-powered report...
+
+# Impact Analysis Report: ext4_file_write_iter Modification
+
+## 1. Code Affected by Change
+**Function**: ext4_file_write_iter
+**File**: fs/ext4/file.c
+**Critical Context**: Core write path handler for ext4 filesystem
+- Impact Scope: Data integrity, Performance, Error handling
+- Hidden Dependencies: VFS layer, journaling, block allocation
+
+## 2. Tests to Run (Immediate Validation)
+- Core Tests: ext4-tests, Filesystem Stress Tests
+- Critical Scenarios: Disk full, fsync, Concurrent writes
+
+## 3. New Tests Required (High Priority)
+- Edge Cases: Partial writes, large files, concurrent operations
+- Failure Modes: I/O errors, metadata corruption
+
+## 4. Risk Level: HIGH
+**Why?** Critical functionality, limited test coverage, data corruption potential
+
+## 5. Recommendations for Safe Implementation
+- Code review, coverage analysis, pre-change validation
 ```
 
 #### 4. **Complete Pipeline**
@@ -562,19 +600,23 @@ For large subsystems:
 ## 🗺️ Roadmap
 
 ### Completed (v0.1.0)
-- ✅ Tree-sitter C parser integration
+- ✅ Tree-sitter C parser integration with macro preprocessing
 - ✅ Neo4j graph database storage
 - ✅ KUnit test mapping
 - ✅ Multi-hop call chain analysis
 - ✅ CLI interface
 - ✅ YAML configuration
+- ✅ LLM-powered natural language reports (Gemini, OpenAI, Anthropic, Ollama)
+- ✅ Subsystem auto-detection utility
+- ✅ Multi-subsystem analysis (tested with ext4, btrfs, proc)
+- ✅ Comprehensive documentation (architecture, macro handling, Neo4j setup)
 
 ### Planned (v0.2.0)
-- [ ] LLM-powered natural language reports
 - [ ] Web UI for visualization
 - [ ] Data flow analysis
 - [ ] Struct field tracking
 - [ ] Git integration for historical analysis
+- [ ] Parallel preprocessing for large subsystems
 
 ### Future
 - [ ] IDE integration (VS Code, Neovim)
@@ -608,18 +650,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Statistics
 
-**Current Database (ext4 subsystem):**
-- 1,121 Functions
-- 2,254 Call relationships
+**Current Database (3 subsystems: ext4, btrfs, proc):**
+- 4,188 Functions
+- 10,003 Call relationships
 - 13 Test cases
 - 17 Test coverage mappings
-- 37 Source files analyzed
+- 134 Source files analyzed
+- 3 Subsystems ingested
 
 **Analysis Capabilities:**
 - Multi-hop traversal (up to 10 hops)
-- Risk assessment (4 levels)
-- Test coverage tracking
+- Risk assessment (4 levels: LOW, MEDIUM, HIGH, CRITICAL)
+- Test coverage tracking (direct and indirect)
 - Cross-subsystem call detection
+- LLM-powered natural language reports
+- Subsystem boundary auto-detection
 
 ---
 
