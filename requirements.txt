@@ -1,0 +1,28 @@
+# Core Parsing Dependencies
+tree-sitter==0.25.2
+tree-sitter-c==0.23.5
+
+# Graph Database
+neo4j>=5.14.0
+llama-index-core>=0.12.0
+llama-index-graph-stores-neo4j>=0.4.0
+
+# LLM Integration
+openai==1.57.4
+google-generativeai==0.8.3
+anthropic==0.42.0  # Optional
+
+# Utilities
+pydantic==2.10.4
+python-dotenv==1.0.1
+pyyaml==6.0.2
+click==8.1.7
+rich==13.9.4  # CLI formatting
+tqdm==4.67.1  # Progress bars
+
+# Testing
+pytest==8.3.4
+pytest-cov==6.0.0
+black==24.10.0
+mypy==1.13.0
+ruff==0.8.4
