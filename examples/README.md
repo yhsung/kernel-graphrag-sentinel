@@ -29,7 +29,24 @@ python3 src/main.py --config examples/analyze_ext4.yaml pipeline fs/ext4
 
 All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) to demonstrate differences between LLM providers.
 
-#### 1. `anthropic-claude-haiku-4-5.md` ⭐ Recommended
+#### 0. `rule-based-report.md` (Non-LLM Baseline)
+**Provider:** Built-in analyzer (no LLM)
+**Report Length:** 38 lines
+**Generation Time:** <1 second
+**Quality:** ⭐⭐⭐ Structured Data
+
+**Highlights:**
+- Instant generation (no API calls)
+- Pure statistical analysis
+- Call graph metrics
+- Test coverage summary
+- Baseline for LLM comparison
+
+**Best for:** Quick checks, CI/CD pipelines, cost-free analysis
+
+---
+
+#### 1. `anthropic-claude-haiku-4-5-report.md` ⭐ Recommended
 **Provider:** Anthropic Claude
 **Model:** claude-haiku-4-5
 **Report Length:** 203 lines
@@ -50,7 +67,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 #### 2. `openai-gpt5-nano-report.md`
 **Provider:** OpenAI
 **Model:** gpt-5-nano-2025-08-07 (reasoning model)
-**Report Length:** 115 lines
+**Report Length:** 120 lines
 **Generation Time:** ~32 seconds
 **Quality:** ⭐⭐⭐⭐ Good
 
@@ -60,7 +77,47 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 - Good actionable recommendations
 - Appendix with key considerations
 
-**Best for:** Teams using OpenAI, reasoning-intensive analysis
+**Best for:** Teams using OpenAI, lightweight reasoning model
+
+**Note:** Requires 16,384 max_completion_tokens for reasoning models
+
+---
+
+#### 2a. `openai-gpt5-mini-report.md`
+**Provider:** OpenAI
+**Model:** gpt-5-mini (reasoning model)
+**Report Length:** 171 lines
+**Generation Time:** ~40 seconds
+**Quality:** ⭐⭐⭐⭐⭐ Excellent
+
+**Highlights:**
+- Most comprehensive OpenAI report
+- Detailed userland impact analysis
+- Extensive testing recommendations
+- Strong risk assessment
+- Professional formatting
+
+**Best for:** Production use, comprehensive analysis, thorough documentation
+
+**Note:** Requires 16,384 max_completion_tokens for reasoning models
+
+---
+
+#### 2b. `openai-gpt5.2-report.md`
+**Provider:** OpenAI
+**Model:** gpt-5.2 (latest reasoning model)
+**Report Length:** 156 lines
+**Generation Time:** ~38 seconds
+**Quality:** ⭐⭐⭐⭐⭐ Excellent
+
+**Highlights:**
+- Latest GPT-5 model generation
+- Detailed ABI stability analysis
+- Scope of behavioral impact assessment
+- Strong formatting change awareness
+- Comprehensive testing strategy
+
+**Best for:** Testing latest OpenAI models, production documentation
 
 **Note:** Requires 16,384 max_completion_tokens for reasoning models
 
@@ -162,11 +219,14 @@ Quick reference for choosing the right provider:
 
 | Provider | Model | Lines | Time | Cost | Quality | Best For |
 |----------|-------|-------|------|------|---------|----------|
+| **Built-in** | rule-based | 38 | <1s | Free | ⭐⭐⭐ | CI/CD baseline |
 | **Anthropic** | claude-haiku-4-5 | 203 | 18s | $0.001 | ⭐⭐⭐⭐⭐ | Production |
-| **OpenAI** | gpt-5-nano | 115 | 32s | $0.0008 | ⭐⭐⭐⭐ | Reasoning |
+| **OpenAI** | gpt-5-nano | 120 | 32s | $0.0008 | ⭐⭐⭐⭐ | Lightweight |
+| **OpenAI** | gpt-5-mini | 171 | 40s | $0.001 | ⭐⭐⭐⭐⭐ | Comprehensive |
+| **OpenAI** | gpt-5.2 | 156 | 38s | $0.001 | ⭐⭐⭐⭐⭐ | Latest GPT |
 | **Gemini** | gemini-3-flash | 43 | 10s | Free | ⭐⭐⭐ | Quick tests |
 | **Gemini** | gemini-3.0-pro | 74 | 15s | Free | ⭐⭐⭐⭐ | Balanced |
-| **Gemini** | gemini-2.5-pro | 88 | 18s | Free | ⭐⭐⭐⭐ | Latest |
+| **Gemini** | gemini-2.5-pro | 88 | 18s | Free | ⭐⭐⭐⭐ | Latest Gemini |
 | **Ollama** | qwen3-vl:30b | 150 | 45s | Free | ⭐⭐⭐⭐ | Unlimited |
 
 ---
@@ -591,13 +651,15 @@ To contribute new examples:
 
 **Current examples:**
 - Configuration files: 1
-- LLM example reports: 6 (Anthropic, OpenAI, Gemini 3x, Ollama)
-  - Anthropic Claude Haiku 4-5
-  - OpenAI GPT-5 Nano
-  - Gemini 3.0 Flash, Gemini 3.0 Pro, Gemini 2.5 Pro
-  - Ollama Qwen3-VL 30B
+- Example reports: 10 total
+  - 1 Rule-based (non-LLM) baseline
+  - 9 LLM reports across 4 providers:
+    - Anthropic: Claude Haiku 4-5 (1 model)
+    - OpenAI: GPT-5 Nano, GPT-5 Mini, GPT-5.2 (3 models)
+    - Gemini: 3.0 Flash, 3.0 Pro, 2.5 Pro (3 models)
+    - Ollama: Qwen3-VL 30B (1 model)
 - Query examples: 30+ Cypher queries
-- Total documentation: 3,500+ lines
+- Total documentation: 4,000+ lines
 
 **Documentation coverage:**
 - Main docs: 3,343 lines across 4 files
