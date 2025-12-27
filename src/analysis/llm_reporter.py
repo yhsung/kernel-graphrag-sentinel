@@ -227,17 +227,37 @@ Report:"""
     def _call_openai(self, prompt: str) -> str:
         """Call OpenAI API."""
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.model,
-                messages=[
+            # Build request parameters
+            params = {
+                "model": self.config.model,
+                "messages": [
                     {"role": "system", "content": "You are a Linux kernel code analysis expert."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=self.config.temperature,
-                max_completion_tokens=2048  # Updated for newer OpenAI models
-            )
+                "max_completion_tokens": 2048
+            }
+
+            # Some models (e.g., gpt-5-nano) only support default temperature=1
+            # Only include temperature if it's not the default
+            if self.config.temperature != 1.0:
+                params["temperature"] = self.config.temperature
+
+            response = self.client.chat.completions.create(**params)
             return response.choices[0].message.content
         except Exception as e:
+            # If temperature is not supported, retry without it
+            if "temperature" in str(e) and "not support" in str(e).lower():
+                logger.warning(f"Model {self.config.model} doesn't support custom temperature, retrying with default")
+                response = self.client.chat.completions.create(
+                    model=self.config.model,
+                    messages=[
+                        {"role": "system", "content": "You are a Linux kernel code analysis expert."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_completion_tokens=2048
+                )
+                return response.choices[0].message.content
+
             logger.error(f"OpenAI API call failed: {e}")
             raise
 
