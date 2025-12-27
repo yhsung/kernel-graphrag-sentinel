@@ -16,7 +16,7 @@ try:
     # Look for .env in project root
     env_path = Path(__file__).parent.parent / '.env'
     if env_path.exists():
-        load_dotenv(env_path, override=True)  # Override existing env vars
+        load_dotenv(env_path, override=False)  # Don't override existing env vars (command-line takes precedence)
 except ImportError:
     pass  # python-dotenv not installed, use existing environment
 
