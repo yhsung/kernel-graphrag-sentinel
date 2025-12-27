@@ -8,6 +8,8 @@ import logging
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
+from .graph_exporter import GraphExporter
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,15 +25,18 @@ class LLMConfig:
 class LLMReporter:
     """Generates natural language reports using LLMs."""
 
-    def __init__(self, config: LLMConfig):
+    def __init__(self, config: LLMConfig, graph_store=None):
         """
         Initialize LLM reporter.
 
         Args:
             config: LLM configuration
+            graph_store: Optional Neo4j graph store for diagram generation
         """
         self.config = config
         self.client = None
+        self.graph_store = graph_store
+        self.graph_exporter = GraphExporter(graph_store) if graph_store else None
 
         # Initialize appropriate client
         if config.provider == "gemini":
@@ -139,6 +144,18 @@ class LLMReporter:
         lines.append(f"Function: {function_name}")
         lines.append(f"File: {impact_data.get('file_path', 'unknown')}")
         lines.append("")
+
+        # Add Mermaid call graph visualization if graph exporter is available
+        if self.graph_exporter:
+            try:
+                mermaid_diagram = self.graph_exporter.generate_mermaid_for_impact(impact_data)
+                lines.append("Call Graph Visualization:")
+                lines.append(mermaid_diagram)
+                lines.append("")
+                lines.append("(Note: Include this Mermaid diagram in your report)")
+                lines.append("")
+            except Exception as e:
+                logger.warning(f"Failed to generate Mermaid diagram: {e}")
 
         # Statistics
         stats = impact_data.get('stats', {})

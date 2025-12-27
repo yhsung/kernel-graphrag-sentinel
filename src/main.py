@@ -201,7 +201,8 @@ def analyze(ctx, function_name, max_depth, output, llm):
                         temperature=config.llm.temperature
                     )
 
-                    reporter = LLMReporter(llm_config)
+                    # Pass graph_store for Mermaid diagram generation
+                    reporter = LLMReporter(llm_config, graph_store=store)
 
                     # Convert ImpactResult to dict
                     impact_data = {
@@ -381,19 +382,84 @@ def top_functions(ctx, subsystem, min_callers, limit):
                       f"({record['call_count']:3} calls) - {file_short}")
 
 
+@cli.command('export-graph')
+@click.argument('function_name')
+@click.option('--format', type=click.Choice(['mermaid', 'dot', 'json']),
+              default='mermaid', help='Export format')
+@click.option('--output', '-o', help='Output file (stdout if not specified)')
+@click.option('--max-depth', default=2, help='Maximum call graph depth')
+@click.option('--direction', type=click.Choice(['callers', 'callees', 'both']),
+              default='both', help='Graph direction')
+@click.pass_context
+def export_graph(ctx, function_name, format, output, max_depth, direction):
+    """Export call graph visualization for a function.
+
+    Exports call graph in various formats:
+    - mermaid: Mermaid diagram (for GitHub/VS Code)
+    - dot: Graphviz DOT format
+    - json: JSON format for custom processing
+
+    Examples:
+        python3 src/main.py export-graph show_val_kb --format mermaid
+        python3 src/main.py export-graph show_val_kb --format dot -o graph.dot
+        python3 src/main.py export-graph show_val_kb --format json --direction callers
+    """
+    config = ctx.obj['config']
+
+    from src.module_b.graph_store import Neo4jGraphStore
+    from src.analysis.graph_exporter import GraphExporter
+
+    try:
+        # Initialize graph store
+        store = Neo4jGraphStore(
+            uri=config.neo4j.url,
+            user=config.neo4j.user,
+            password=config.neo4j.password
+        )
+
+        # Create exporter
+        exporter = GraphExporter(store)
+
+        # Export graph
+        graph_output = exporter.export_callgraph(
+            function_name=function_name,
+            max_depth=max_depth,
+            format=format,
+            direction=direction
+        )
+
+        # Output result
+        if output:
+            with open(output, 'w') as f:
+                f.write(graph_output)
+            click.echo(f"✅ Graph exported to {output} ({format} format)")
+
+            if format == 'dot':
+                click.echo(f"\nTo render: dot -Tpng {output} -o graph.png")
+            elif format == 'mermaid':
+                click.echo(f"\nView in GitHub, VS Code, or https://mermaid.live/")
+        else:
+            click.echo(graph_output)
+
+    except Exception as e:
+        click.echo(f"❌ Error exporting graph: {e}", err=True)
+        raise click.Abort()
+
+
 @cli.command()
 @click.pass_context
 def version(ctx):
     """Show version information."""
     click.echo("Kernel-GraphRAG Sentinel v0.1.0")
     click.echo("AI-powered Linux kernel code analysis")
-    click.echo("\nPhases completed: 6/7 (86%)")
+    click.echo("\nPhases completed: 7/7 (100%)")
     click.echo("  ✅ Phase 1: Environment Setup")
     click.echo("  ✅ Phase 2: C Code Parser")
     click.echo("  ✅ Phase 3: Neo4j Graph Store")
     click.echo("  ✅ Phase 4: KUnit Test Mapper")
     click.echo("  ✅ Phase 5: Impact Analysis")
     click.echo("  ✅ Phase 6: CLI Interface")
+    click.echo("  ✅ Phase 7: Visualization & Documentation")
 
 
 def main():
