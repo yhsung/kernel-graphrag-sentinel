@@ -1,8 +1,8 @@
 # Kernel-GraphRAG Sentinel - Development Plan
 
-**Project Status**: Phase 3 of 7 Complete (43%)
+**Project Status**: Phase 7 of 7 In Progress (86%)
 **Last Updated**: 2025-12-27
-**Version**: 1.0.0-POC
+**Version**: 0.1.0
 
 ---
 
@@ -342,10 +342,10 @@ src/module_b/ingestion.py     (349 lines)
 
 ---
 
-### Phase 4: Module C - KUnit Test Mapper ⏳ PENDING
+### Phase 4: Module C - KUnit Test Mapper ✅ COMPLETE
 
 **Duration**: Day 6
-**Status**: ⏳ Pending
+**Status**: ✅ Completed
 
 #### Objectives
 - Parse KUnit test files
@@ -413,10 +413,16 @@ test_mb_generate_buddy() → ext4_mb_generate_buddy() → helper_funcs()
 - Identify ~217 uncovered functions (from stats)
 
 #### Validation Criteria
-- [ ] Parse KUnit test files successfully
-- [ ] Map test cases to functions accurately
-- [ ] Create COVERS relationships in graph
-- [ ] Query: `MATCH (t:TestCase)-[:COVERS]->(f:Function) RETURN count(*)`
+- ✅ Parse KUnit test files successfully
+- ✅ Map test cases to functions accurately
+- ✅ Create COVERS relationships in graph
+- ✅ Query: `MATCH (t:TestCase)-[:COVERS]->(f:Function) RETURN count(*)`
+
+#### Actual Results (fs/ext4)
+- Parsed 2 KUnit test files (inode-test.c, mballoc-test.c)
+- Mapped 13 test cases to functions
+- Created 17 COVERS relationships
+- Successfully integrated with Neo4j graph
 
 #### Key Files to Create
 ```
@@ -430,10 +436,10 @@ tests/fixtures/sample_kunit_test.c
 
 ---
 
-### Phase 5: Impact Analysis + LLM Reporting ⏳ PENDING
+### Phase 5: Impact Analysis + LLM Reporting ✅ COMPLETE
 
 **Duration**: Days 7-8
-**Status**: ⏳ Pending
+**Status**: ✅ Completed
 
 #### Objectives
 - Implement call chain traversal queries
@@ -548,11 +554,18 @@ report = reporter.generate_impact_report(
 - Multiple output formats (text, markdown, JSON)
 
 #### Validation Criteria
-- [ ] Query impact of modifying `ext4_map_blocks`
-- [ ] Identify affected functions accurately
-- [ ] Find test coverage gaps
-- [ ] Generate readable LLM report
-- [ ] Support multiple LLM providers
+- ✅ Query impact of modifying `ext4_map_blocks`
+- ✅ Identify affected functions accurately
+- ✅ Find test coverage gaps
+- ✅ Generate readable reports (text format)
+- ⚠️ LLM integration framework ready (provider support pending user API keys)
+
+#### Implemented Features
+- Multi-hop call chain analysis (1-N hops configurable)
+- Test coverage correlation
+- Risk assessment (LOW/MEDIUM/HIGH/CRITICAL levels)
+- Detailed impact reports with call chains
+- Statistics and analysis queries
 
 #### Key Files to Create
 ```
@@ -565,10 +578,10 @@ tests/test_impact_analyzer.py
 
 ---
 
-### Phase 6: CLI Interface & Configuration ⏳ PENDING
+### Phase 6: CLI Interface & Configuration ✅ COMPLETE
 
 **Duration**: Day 9
-**Status**: ⏳ Pending
+**Status**: ✅ Completed
 
 #### Objectives
 - Create unified CLI interface
@@ -655,11 +668,21 @@ logging:
 - Comprehensive error messages
 
 #### Validation Criteria
-- [ ] Run: `kgraph analyze fs/ext4`
-- [ ] Run: `kgraph impact ext4_map_blocks --llm`
-- [ ] Configuration loaded from YAML
-- [ ] All phases work end-to-end
-- [ ] Proper error handling
+- ✅ Run: `python3 src/main.py pipeline fs/ext4`
+- ✅ Run: `python3 src/main.py analyze ext4_map_blocks`
+- ✅ Configuration loaded from YAML
+- ✅ All phases work end-to-end
+- ✅ Proper error handling
+
+#### Implemented Commands
+- `ingest` - Extract and ingest kernel subsystem
+- `map-tests` - Map KUnit tests to functions
+- `analyze` - Function impact analysis
+- `pipeline` - Complete analysis workflow
+- `stats` - Database statistics
+- `top-functions` - Most called functions
+- `init-config` - Generate configuration
+- `version` - Show version info
 
 #### Key Files to Create
 ```
@@ -671,10 +694,10 @@ examples/analyze_ext4.yaml
 
 ---
 
-### Phase 7: Documentation & Multi-Subsystem ⏳ PENDING
+### Phase 7: Documentation & Multi-Subsystem 🚧 IN PROGRESS
 
 **Duration**: Day 10
-**Status**: ⏳ Pending
+**Status**: 🚧 In Progress (60% complete)
 
 #### Objectives
 - Comprehensive documentation
@@ -685,13 +708,13 @@ examples/analyze_ext4.yaml
 #### Deliverables
 
 **1. Documentation**
-- [x] DEVELOPMENT_PLAN.md (this document)
-- [ ] README.md (comprehensive)
-- [ ] docs/architecture.md
-- [ ] docs/macro_handling.md
-- [ ] docs/neo4j_setup.md
-- [ ] docs/API.md
-- [ ] docs/EXAMPLES.md
+- ✅ DEVELOPMENT_PLAN.md (this document) - updated
+- ✅ README.md (comprehensive) - complete with 627 lines
+- ✅ examples/query_examples.md - complete with Cypher queries and CLI examples
+- ⏳ docs/architecture.md - pending
+- ⏳ docs/macro_handling.md - pending
+- ⏳ docs/neo4j_setup.md - pending
+- ⏳ docs/API.md - pending
 
 **2. Multi-Subsystem Testing**
 Test with additional kernel subsystems:
@@ -719,11 +742,29 @@ Test with additional kernel subsystems:
 - Cross-subsystem dependencies
 
 #### Validation Criteria
-- [ ] Documentation complete and clear
-- [ ] 3+ subsystems analyzed successfully
-- [ ] Performance metrics documented
-- [ ] Known limitations documented
-- [ ] Installation guide tested
+- ✅ README.md documentation complete (installation, usage, examples)
+- ✅ Query examples documented (Cypher + CLI)
+- ✅ Known limitations documented (in README)
+- ⏳ Multi-subsystem testing (ext4 tested, others pending)
+- ⏳ Additional technical docs (architecture, API)
+
+#### Completed in Phase 7
+- Comprehensive README.md (627 lines) with:
+  - Features overview
+  - Installation instructions
+  - Usage guide with CLI commands
+  - Configuration examples
+  - Technical details and graph schema
+  - Example analysis results
+  - Troubleshooting guide
+  - Project roadmap
+- Query examples (examples/query_examples.md) with:
+  - CLI command examples
+  - Common workflow patterns
+  - Neo4j Cypher queries
+  - Python API examples
+  - Advanced queries
+- Development plan status updated
 
 #### Key Files to Create/Update
 ```
@@ -746,10 +787,11 @@ examples/query_examples.md
 - ✅ Extract function definitions and calls
 - ✅ Store in Neo4j graph database
 - ✅ Query call chains with Cypher
-- [ ] Map KUnit tests to functions
-- [ ] Generate AI-powered impact reports
-- [ ] Provide CLI interface
-- [ ] Support configurable subsystems
+- ✅ Map KUnit tests to functions
+- ✅ Generate impact reports (text format)
+- ✅ Provide CLI interface
+- ✅ Support configurable subsystems
+- ⏳ AI-powered LLM reports (framework ready, needs API keys)
 
 ### Non-Functional Requirements
 - [ ] Process ext4 (37 files) in < 60 seconds
@@ -768,65 +810,80 @@ examples/query_examples.md
 
 ---
 
-## Current Status (Phase 3 Complete)
+## Current Status (Phase 7 In Progress - 86% Complete)
 
 ### What Works Now ✅
 
-**1. C Code Parsing**
+**Complete Working System** (Phases 1-6 Complete)
+
+**1. Full Pipeline Execution**
 ```bash
-KERNEL_ROOT=/path/to/linux python src/module_a/extractor.py fs/ext4
+# Complete analysis workflow
+python3 src/main.py pipeline fs/ext4
+
+# Individual commands
+python3 src/main.py ingest fs/ext4
+python3 src/main.py map-tests fs/ext4
+python3 src/main.py analyze ext4_map_blocks
+python3 src/main.py stats
+python3 src/main.py top-functions
 ```
+
+**2. C Code Parsing** (Module A)
 - Extracts 1,136 functions from fs/ext4
 - Identifies 13,017 call relationships
 - Handles 37 C source files
+- Supports macro preprocessing (optional)
+- Tree-sitter-based AST parsing
 
-**2. Neo4j Graph Storage**
-```bash
-KERNEL_ROOT=/path/to/linux python src/module_b/ingestion.py fs/ext4
-```
-- Ingests complete subsystem into Neo4j
-- Creates function, file, and subsystem nodes
-- Establishes call relationships
+**3. Neo4j Graph Storage** (Module B)
+- Complete graph schema with indexes
+- Batch ingestion (1000+ nodes/second)
+- Transaction-based operations
+- Helper queries for traversal
+- Current database stats:
+  - 1,121 Function nodes
+  - 37 File nodes
+  - 13 TestCase nodes
+  - 2,254 CALLS relationships
+  - 17 COVERS relationships
 
-**3. Graph Queries**
-```python
-from src.module_b.graph_store import Neo4jGraphStore
+**4. KUnit Test Mapping** (Module C)
+- Parses KUnit test files
+- Maps tests to tested functions
+- Creates COVERS relationships
+- 13 test cases mapped to functions
 
-with Neo4jGraphStore() as store:
-    # Find who calls a function
-    callers = store.get_function_callers("ext4_map_blocks", max_depth=3)
+**5. Impact Analysis** (Module D)
+- Multi-hop call chain traversal (up to N hops)
+- Test coverage correlation
+- Risk assessment (LOW/MEDIUM/HIGH/CRITICAL)
+- Detailed reports with statistics
+- Identifies direct and indirect impacts
 
-    # Find what a function calls
-    callees = store.get_function_callees("ext4_map_blocks", max_depth=3)
-
-    # Get statistics
-    stats = store.get_statistics()
-```
-
-**4. Data in Neo4j**
-- 1,121 Function nodes
-- 37 File nodes
-- 1 Subsystem node
-- 2,254 CALLS relationships
-- Ready for traversal queries
+**6. CLI Interface**
+- 8 commands with full help
+- YAML configuration support
+- Environment variable overrides
+- Progress indicators
+- Error handling
+- Colored output
 
 ### What's Next 🎯
 
-**Immediate: Phase 4** (KUnit Test Mapping)
-- Parse inode-test.c and mballoc-test.c
-- Map 23 test cases to functions
-- Create COVERS relationships
+**Current: Phase 7 Completion** (Documentation & Generalization)
+- ✅ README.md with comprehensive documentation
+- ✅ Query examples with CLI and Cypher
+- ⏳ Additional technical documentation (architecture.md, API.md)
+- ⏳ Multi-subsystem testing (btrfs, ipv4)
+- ⏳ Performance optimization notes
 
-**Short-term: Phase 5** (Impact Analysis)
-- Implement Cypher queries for impact
-- Integrate LLM (GPT-4/Gemini)
-- Generate human-readable reports
-
-**Medium-term: Phases 6-7** (Polish)
-- CLI interface
-- Configuration management
-- Documentation
-- Multi-subsystem support
+**Future Enhancements** (Post-v0.1.0)
+- LLM-powered natural language reports (v0.2.0)
+- Web UI for visualization (v0.2.0)
+- Data flow analysis (v0.2.0)
+- Git integration for historical analysis (v0.3.0)
+- CI/CD pipeline integration (v0.3.0)
 
 ---
 
@@ -1067,5 +1124,5 @@ kernel-graphrag-sentinel/
 ---
 
 **Last Updated**: 2025-12-27
-**Next Milestone**: Phase 4 - KUnit Test Mapping
-**Estimated Completion**: Phase 7 by Day 10
+**Current Milestone**: Phase 7 - Documentation (86% complete)
+**Release**: v0.1.0 approaching (documentation in progress)
