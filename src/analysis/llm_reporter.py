@@ -228,13 +228,16 @@ Report:"""
         """Call OpenAI API."""
         try:
             # Build request parameters
+            # Reasoning models (gpt-5, o1) need more tokens as they use tokens for thinking
+            max_tokens = 16384 if "gpt-5" in self.config.model or "o1" in self.config.model else 2048
+
             params = {
                 "model": self.config.model,
                 "messages": [
                     {"role": "system", "content": "You are a Linux kernel code analysis expert."},
                     {"role": "user", "content": prompt}
                 ],
-                "max_completion_tokens": 2048
+                "max_completion_tokens": max_tokens
             }
 
             # Some models (e.g., gpt-5-nano) only support default temperature=1
@@ -243,20 +246,30 @@ Report:"""
                 params["temperature"] = self.config.temperature
 
             response = self.client.chat.completions.create(**params)
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            if not content:
+                logger.warning(f"OpenAI returned empty content. Response: {response}")
+                return "Error: LLM returned empty response"
+            return content
         except Exception as e:
             # If temperature is not supported, retry without it
             if "temperature" in str(e) and "not support" in str(e).lower():
                 logger.warning(f"Model {self.config.model} doesn't support custom temperature, retrying with default")
+                # Use same token limit as above
+                max_tokens = 16384 if "gpt-5" in self.config.model or "o1" in self.config.model else 2048
                 response = self.client.chat.completions.create(
                     model=self.config.model,
                     messages=[
                         {"role": "system", "content": "You are a Linux kernel code analysis expert."},
                         {"role": "user", "content": prompt}
                     ],
-                    max_completion_tokens=2048
+                    max_completion_tokens=max_tokens
                 )
-                return response.choices[0].message.content
+                content = response.choices[0].message.content
+                if not content:
+                    logger.warning(f"OpenAI returned empty content on retry. Response: {response}")
+                    return "Error: LLM returned empty response"
+                return content
 
             logger.error(f"OpenAI API call failed: {e}")
             raise
