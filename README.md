@@ -122,14 +122,17 @@ python3 src/main.py version
 
 ### First Analysis
 
-Run the complete analysis pipeline on the ext4 filesystem:
+Run the complete analysis pipeline on a kernel subsystem:
 
 ```bash
-# Extract, ingest, and map tests for ext4
-python3 src/main.py pipeline fs/ext4
+# Extract, ingest, and map tests for /proc filesystem
+python3 src/main.py pipeline fs/proc
 
-# Analyze a specific function
-python3 src/main.py analyze ext4_map_blocks --max-depth 3
+# Analyze a specific function (show_val_kb formats memory statistics for /proc/meminfo)
+python3 src/main.py analyze show_val_kb --max-depth 3
+
+# Generate AI-powered impact report
+python3 src/main.py analyze show_val_kb --llm --output report.md
 
 # View database statistics
 python3 src/main.py stats
@@ -177,61 +180,86 @@ Comprehensive impact analysis for any function:
 
 ```bash
 # Standard impact analysis
-python3 src/main.py analyze ext4_map_blocks
+python3 src/main.py analyze show_val_kb
 
 # Deeper analysis (up to 5 hops)
-python3 src/main.py analyze ext4_mb_new_blocks_simple --max-depth 5
+python3 src/main.py analyze show_val_kb --max-depth 5
 
 # Save to file
-python3 src/main.py analyze ext4_inode_bitmap --output report.txt
+python3 src/main.py analyze show_val_kb --output report.txt
 
 # AI-powered natural language report (requires LLM configuration)
-python3 src/main.py analyze ext4_file_write_iter --llm
+python3 src/main.py analyze show_val_kb --llm
+
+# Compare different LLM providers
+LLM_PROVIDER=anthropic python3 src/main.py analyze show_val_kb --llm
+LLM_PROVIDER=gemini python3 src/main.py analyze show_val_kb --llm
+LLM_PROVIDER=ollama python3 src/main.py analyze show_val_kb --llm
 ```
 
 **Standard Output:**
 ```
-IMPACT ANALYSIS: ext4_map_blocks
+IMPACT ANALYSIS: show_val_kb
 ================================================================================
-File: fs/ext4/inode.c
+File: /workspaces/ubuntu/linux-6.13/fs/proc/meminfo.c
 
 SUMMARY
-  Direct callers:       12
-  Indirect callers:     45 (2-3 hops)
-  Direct test coverage: 2 tests
-  Indirect test coverage: 5 tests
-  Total call chains:    57
+  Direct callers:       49
+  Indirect callers:     0
+  Direct callees:       0
+  Indirect callees:     0
+  Direct test coverage: 0
+  Indirect test coverage: 0
+  Total call chains:    1
 
 RISK ASSESSMENT
-  Risk Level: MEDIUM-HIGH (widely used, limited test coverage)
+  Risk Level: CRITICAL (widely used, no test coverage)
 ```
 
-**LLM-Powered Output:**
-```
-🤖 Generating AI-powered report...
+**LLM-Powered Output Example:**
 
-# Impact Analysis Report: ext4_file_write_iter Modification
+See comprehensive example reports in `examples/reports/` directory comparing 4 LLM providers:
+- **Anthropic Claude Haiku 4-5** (203 lines) - Best quality, recommended for production
+- **OpenAI GPT-5 Mini** (171 lines) - Most comprehensive OpenAI model
+- **Gemini 3.0 Pro** (74 lines) - Balanced speed and quality, free tier
+- **Ollama Qwen3-VL 30B** (150 lines) - Unlimited local usage
+
+Sample output (Anthropic Claude):
+```markdown
+# Impact Analysis Report: show_val_kb Modification
+
+## Executive Summary
+- Function: show_val_kb (fs/proc/meminfo.c)
+- Risk Level: 🔴 HIGH - Critical /proc/meminfo interface
+- Impact: System monitoring tools, OOM killers, memory management
 
 ## 1. Code Affected by Change
-**Function**: ext4_file_write_iter
-**File**: fs/ext4/file.c
-**Critical Context**: Core write path handler for ext4 filesystem
-- Impact Scope: Data integrity, Performance, Error handling
-- Hidden Dependencies: VFS layer, journaling, block allocation
+**Primary Impact:** /proc/meminfo formatting (49 call sites in meminfo_proc_show)
+**Downstream Impact:**
+- procps suite (free, top, vmstat)
+- System monitors (htop, glances)
+- Cloud agents (Prometheus, Datadog)
 
-## 2. Tests to Run (Immediate Validation)
-- Core Tests: ext4-tests, Filesystem Stress Tests
-- Critical Scenarios: Disk full, fsync, Concurrent writes
+## 2. Tests to Run
+**Mandatory:**
+- LTP fs/proc test suite
+- Kselftest tools/testing/selftests/proc/
+- Userspace tool validation (free -k, vmstat -s)
 
-## 3. New Tests Required (High Priority)
-- Edge Cases: Partial writes, large files, concurrent operations
-- Failure Modes: I/O errors, metadata corruption
+## 3. New Tests Recommended
+- [ ] Format consistency test (before/after diff)
+- [ ] Boundary value testing (zero, TB+ memory)
+- [ ] KUnit test for show_val_kb directly
 
 ## 4. Risk Level: HIGH
-**Why?** Critical functionality, limited test coverage, data corruption potential
+**Rationale:** /proc/meminfo is a stable ABI. Breaking format = breaking userspace.
+49 call sites means single bug affects all memory statistics output.
 
-## 5. Recommendations for Safe Implementation
-- Code review, coverage analysis, pre-change validation
+## 5. Implementation Recommendations
+✓ Preserve exact output format ("%12lu kB\n")
+✓ Golden image comparison in patch description
+✓ Test on 32-bit and 64-bit architectures
+✓ Verify no integer overflow for large memory systems
 ```
 
 #### 4. **Complete Pipeline**
@@ -320,16 +348,24 @@ analysis:
   max_results: 100
 
 llm:
-  provider: openai
-  model: gpt-4
-  api_key: ${OPENAI_API_KEY}
+  provider: gemini  # openai, gemini, anthropic, ollama
+  model: gemini-3-flash-preview
+  api_key: ${GEMINI_API_KEY}
   temperature: 0.7
 ```
+
+**Supported LLM Providers:**
+- **OpenAI**: GPT-4, GPT-5 Nano/Mini (reasoning models)
+- **Google Gemini**: Flash/Pro models (uses `google-genai` package)
+- **Anthropic**: Claude Haiku 4-5 (best quality)
+- **Ollama**: Local models (qwen3-vl:30b, unlimited usage)
+
+See `docs/llm_provider_guide.md` for detailed setup and `examples/reports/` for quality comparison.
 
 Use the configuration:
 
 ```bash
-python3 src/main.py --config my-config.yaml pipeline fs/ext4
+python3 src/main.py --config my-config.yaml pipeline fs/proc
 ```
 
 ### Environment Variables
@@ -340,7 +376,48 @@ Override configuration with environment variables:
 export KERNEL_ROOT=/custom/path/to/linux
 export NEO4J_URL=bolt://remote-server:7687
 export NEO4J_PASSWORD=secret
+
+# LLM provider configuration
+export LLM_PROVIDER=anthropic
+export ANTHROPIC_API_KEY=your-key-here
 ```
+
+**Environment Variable Precedence** (highest to lowest):
+1. Command-line environment variables: `LLM_PROVIDER=gemini python3 src/main.py ...`
+2. Shell environment variables: `export LLM_PROVIDER=gemini`
+3. `.env` file values
+
+This allows easy provider switching without modifying configuration files:
+```bash
+# Use Anthropic for this analysis
+LLM_PROVIDER=anthropic python3 src/main.py analyze show_val_kb --llm
+
+# Use Gemini for quick test
+LLM_PROVIDER=gemini python3 src/main.py analyze show_val_kb --llm
+```
+
+---
+
+## 📚 Example Reports & Documentation
+
+The `examples/` directory contains comprehensive documentation and real-world analysis examples:
+
+### LLM Provider Comparison Reports
+
+All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) for direct quality comparison:
+
+| Provider | Model | Lines | Time | Quality | Best For |
+|----------|-------|-------|------|---------|----------|
+| **Built-in** | rule-based | 38 | <1s | ⭐⭐⭐ | CI/CD, baseline |
+| **Anthropic** | claude-haiku-4-5 | 203 | 18s | ⭐⭐⭐⭐⭐ | Production |
+| **OpenAI** | gpt-5-mini | 171 | 40s | ⭐⭐⭐⭐⭐ | Comprehensive |
+| **OpenAI** | gpt-5.2 | 156 | 38s | ⭐⭐⭐⭐⭐ | Latest GPT |
+| **Gemini** | 3.0-pro | 74 | 15s | ⭐⭐⭐⭐ | Balanced |
+| **Ollama** | qwen3-vl:30b | 150 | 45s | ⭐⭐⭐⭐ | Unlimited local |
+
+**View Reports:** `examples/reports/` directory (10 reports total)
+**Documentation:** `examples/README.md` - comprehensive guide with 30+ query examples
+**Setup Guide:** `docs/llm_provider_guide.md` - provider configuration & troubleshooting
 
 ---
 
@@ -427,9 +504,24 @@ kernel-graphrag-sentinel/
 │   ├── install_neo4j.sh       # Neo4j installation script
 │   └── setup_tree_sitter.sh   # tree-sitter setup
 ├── examples/
-│   └── analyze_ext4.yaml      # Example configuration
+│   ├── README.md              # Comprehensive examples documentation
+│   ├── analyze_ext4.yaml      # Example configuration
+│   ├── query_examples.md      # 30+ Neo4j Cypher query examples
+│   └── reports/               # 10 LLM provider comparison reports
+│       ├── rule-based-report.md            # Non-LLM baseline
+│       ├── anthropic-claude-haiku-4-5-report.md
+│       ├── openai-gpt5-nano-report.md
+│       ├── openai-gpt5-mini-report.md
+│       ├── openai-gpt5.2-report.md
+│       ├── gemini-3.0-flash-report.md
+│       ├── gemini-3.0-pro-report.md
+│       ├── gemini-2.5-pro-report.md
+│       └── qwen3-vl-30b-report.md
 ├── docs/
-│   └── DEVELOPMENT_PLAN.md    # Development documentation
+│   ├── architecture.md        # System architecture (1,200+ lines)
+│   ├── neo4j_setup.md        # Neo4j installation & configuration
+│   ├── macro_handling.md     # GCC preprocessor integration
+│   └── llm_provider_guide.md # LLM provider comparison & setup
 ├── requirements.txt           # Python dependencies
 ├── .env.template              # Environment template
 └── README.md                  # This file
@@ -604,12 +696,20 @@ For large subsystems:
 - ✅ Neo4j graph database storage
 - ✅ KUnit test mapping
 - ✅ Multi-hop call chain analysis
-- ✅ CLI interface
-- ✅ YAML configuration
-- ✅ LLM-powered natural language reports (Gemini, OpenAI, Anthropic, Ollama)
+- ✅ CLI interface with comprehensive commands
+- ✅ YAML configuration with environment variable override
+- ✅ LLM-powered natural language reports (4 providers: Anthropic, OpenAI, Gemini, Ollama)
+- ✅ LLM provider comparison (10 example reports across all providers)
 - ✅ Subsystem auto-detection utility
 - ✅ Multi-subsystem analysis (tested with ext4, btrfs, proc)
-- ✅ Comprehensive documentation (architecture, macro handling, Neo4j setup)
+- ✅ Comprehensive documentation:
+  - `docs/architecture.md` (1,200+ lines) - System architecture
+  - `docs/macro_handling.md` (800+ lines) - GCC preprocessor integration
+  - `docs/neo4j_setup.md` (700+ lines) - Database setup & tuning
+  - `docs/llm_provider_guide.md` (643 lines) - LLM provider comparison
+  - `examples/README.md` (700+ lines) - Examples & query library
+- ✅ Google GenAI migration (updated from deprecated package)
+- ✅ Environment variable precedence fix (command-line > .env)
 
 ### Planned (v0.2.0)
 - [ ] Web UI for visualization
@@ -648,23 +748,31 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📊 Statistics
+## 📊 Project Statistics
 
 **Current Database (3 subsystems: ext4, btrfs, proc):**
-- 4,188 Functions
-- 10,003 Call relationships
-- 13 Test cases
+- 4,188 Functions analyzed
+- 10,003 Call relationships mapped
+- 13 Test cases identified
 - 17 Test coverage mappings
-- 134 Source files analyzed
+- 134 Source files processed
 - 3 Subsystems ingested
 
+**Documentation:**
+- 4,000+ total documentation lines
+- 10 LLM provider example reports
+- 30+ Neo4j Cypher query examples
+- 4 comprehensive guides (architecture, Neo4j, macros, LLM providers)
+- Full CLI command reference
+
 **Analysis Capabilities:**
-- Multi-hop traversal (up to 10 hops)
+- Multi-hop call graph traversal (up to 10 hops)
 - Risk assessment (4 levels: LOW, MEDIUM, HIGH, CRITICAL)
 - Test coverage tracking (direct and indirect)
-- Cross-subsystem call detection
-- LLM-powered natural language reports
+- Cross-subsystem dependency detection
+- AI-powered natural language reports (4 LLM providers)
 - Subsystem boundary auto-detection
+- Environment-based provider switching
 
 ---
 
