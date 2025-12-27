@@ -212,11 +212,12 @@ Report:"""
     def _call_gemini(self, prompt: str) -> str:
         """Call Google Gemini API."""
         try:
+            # Gemini 2.0/3.0 Flash supports up to 8192 output tokens
             response = self.client.generate_content(
                 prompt,
                 generation_config={
                     "temperature": self.config.temperature,
-                    "max_output_tokens": 2048,
+                    "max_output_tokens": 8192,
                 }
             )
             return response.text
