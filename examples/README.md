@@ -69,7 +69,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 #### 3. `gemini-3.0-flash-report.md`
 **Provider:** Google Gemini
 **Model:** gemini-3-flash-preview
-**Report Length:** ~80-100 lines
+**Report Length:** 43 lines
 **Generation Time:** ~10 seconds
 **Quality:** ⭐⭐⭐ Good
 
@@ -83,7 +83,41 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ---
 
-#### 4. `qwen3-vl-30b-report.md`
+#### 4. `gemini-3.0-pro-report.md`
+**Provider:** Google Gemini
+**Model:** gemini-3.0-pro-preview
+**Report Length:** 74 lines
+**Generation Time:** ~15 seconds
+**Quality:** ⭐⭐⭐⭐ Very Good
+
+**Highlights:**
+- More detailed than Flash model
+- Better structured analysis
+- Higher quality reasoning
+- Still relatively fast
+
+**Best for:** Production use when speed and quality both matter
+
+---
+
+#### 5. `gemini-2.5-pro-report.md`
+**Provider:** Google Gemini
+**Model:** gemini-2.5-pro-preview (experimental)
+**Report Length:** 88 lines
+**Generation Time:** ~18 seconds
+**Quality:** ⭐⭐⭐⭐ Very Good
+
+**Highlights:**
+- Most comprehensive Gemini report
+- Professional formatting
+- Detailed risk assessment
+- Latest experimental model
+
+**Best for:** Testing cutting-edge Gemini models, comprehensive analysis
+
+---
+
+#### 6. `qwen3-vl-30b-report.md`
 **Provider:** Ollama (Local)
 **Model:** qwen3-vl:30b
 **Report Length:** 150+ lines
@@ -130,7 +164,9 @@ Quick reference for choosing the right provider:
 |----------|-------|-------|------|------|---------|----------|
 | **Anthropic** | claude-haiku-4-5 | 203 | 18s | $0.001 | ⭐⭐⭐⭐⭐ | Production |
 | **OpenAI** | gpt-5-nano | 115 | 32s | $0.0008 | ⭐⭐⭐⭐ | Reasoning |
-| **Gemini** | gemini-3-flash | 80-100 | 10s | Free | ⭐⭐⭐ | Quick tests |
+| **Gemini** | gemini-3-flash | 43 | 10s | Free | ⭐⭐⭐ | Quick tests |
+| **Gemini** | gemini-3.0-pro | 74 | 15s | Free | ⭐⭐⭐⭐ | Balanced |
+| **Gemini** | gemini-2.5-pro | 88 | 18s | Free | ⭐⭐⭐⭐ | Latest |
 | **Ollama** | qwen3-vl:30b | 150 | 45s | Free | ⭐⭐⭐⭐ | Unlimited |
 
 ---
@@ -393,12 +429,14 @@ All LLM-generated reports include these sections (structure varies by provider):
 - Risk factors to monitor
 - Actionable next steps
 
-### Gemini 3.0 Flash (80-100 lines)
+### Gemini Models Comparison
+
+#### Gemini 3.0 Flash (43 lines)
 
 **Strengths:**
-- Very fast generation
+- Fastest generation (~10s)
 - Concise and focused
-- Good for quick decisions
+- Good for quick validation
 - Free tier available
 
 **Example sections:**
@@ -407,6 +445,36 @@ All LLM-generated reports include these sections (structure varies by provider):
 - Testing strategy
 - Risk summary
 - Quick recommendations
+
+#### Gemini 3.0 Pro (74 lines)
+
+**Strengths:**
+- Balanced speed and quality (~15s)
+- More detailed analysis than Flash
+- Better structured output
+- Professional formatting
+
+**Example sections:**
+- Executive summary with risk assessment
+- Detailed code impact analysis
+- Testing requirements (existing and new)
+- Risk level justification
+- Implementation recommendations
+
+#### Gemini 2.5 Pro (88 lines)
+
+**Strengths:**
+- Most comprehensive Gemini report
+- Latest experimental model
+- Detailed ABI/API stability analysis
+- Professional formatting
+
+**Example sections:**
+- Comprehensive impact analysis
+- Downstream impact (critical systems)
+- Testing requirements with specifics
+- Risk assessment with mitigation
+- Implementation checklist
 
 ### Ollama qwen3-vl:30b (150 lines)
 
@@ -523,7 +591,11 @@ To contribute new examples:
 
 **Current examples:**
 - Configuration files: 1
-- LLM example reports: 4 (Anthropic, OpenAI, Gemini, Ollama)
+- LLM example reports: 6 (Anthropic, OpenAI, Gemini 3x, Ollama)
+  - Anthropic Claude Haiku 4-5
+  - OpenAI GPT-5 Nano
+  - Gemini 3.0 Flash, Gemini 3.0 Pro, Gemini 2.5 Pro
+  - Ollama Qwen3-VL 30B
 - Query examples: 30+ Cypher queries
 - Total documentation: 3,500+ lines
 
