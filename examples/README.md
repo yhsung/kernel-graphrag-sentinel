@@ -256,18 +256,20 @@ Quick reference for choosing the right provider:
 
 ## 🚀 Quick Start Examples
 
+**Note:** All examples below use `show_val_kb` from `fs/proc/meminfo.c` as the demonstration function. This is the same function analyzed in all example reports in the `reports/` directory, making it easy to compare results across different LLM providers.
+
 ### Example 1: Basic Analysis with Standard Report
 
 ```bash
 # Analyze a function without LLM (fast, structured output)
-python3 src/main.py analyze ext4_map_blocks --max-depth 3
+python3 src/main.py analyze show_val_kb --max-depth 3
 ```
 
 ### Example 2: AI-Powered Analysis with Anthropic
 
 ```bash
 # Generate comprehensive AI report
-LLM_PROVIDER=anthropic python3 src/main.py analyze ext4_map_blocks --llm --output report.md
+LLM_PROVIDER=anthropic python3 src/main.py analyze show_val_kb --llm --output report.md
 ```
 
 ### Example 3: Quick Test with Gemini
@@ -298,8 +300,8 @@ python3 src/main.py --config examples/analyze_ext4.yaml analyze ext4_file_write_
 
 ```bash
 # Full analysis: ingest + test mapping + analysis
-python3 src/main.py pipeline fs/ext4
-python3 src/main.py analyze ext4_map_blocks --llm --output ext4_analysis.md
+python3 src/main.py pipeline fs/proc
+python3 src/main.py analyze show_val_kb --llm --output show_val_kb_analysis.md
 ```
 
 ---
@@ -352,7 +354,7 @@ python3 src/main.py analyze ext4_map_blocks --llm --output ext4_analysis.md
 
 ```bash
 # Step 1: Analyze with LLM for comprehensive report
-python3 src/main.py analyze ext4_map_blocks --llm --max-depth 3 --output pre_change_analysis.md
+python3 src/main.py analyze show_val_kb --llm --max-depth 3 --output pre_change_analysis.md
 
 # Step 2: Review report sections:
 # - Code affected
@@ -365,7 +367,7 @@ python3 src/main.py analyze ext4_map_blocks --llm --max-depth 3 --output pre_cha
 
 # Step 4: Run recommended tests
 cd /workspaces/ubuntu/linux-6.13
-./tools/testing/kunit/kunit.py run --kunitconfig=fs/ext4
+make -C tools/testing/selftests/proc
 ```
 
 ### Use Case 2: Assessing Test Coverage
@@ -390,7 +392,7 @@ done
 
 ```bash
 # Analyze same function with all providers
-function="ext4_map_blocks"
+function="show_val_kb"
 
 LLM_PROVIDER=anthropic python3 src/main.py analyze $function --llm --output comparison/anthropic.md
 LLM_PROVIDER=openai python3 src/main.py analyze $function --llm --output comparison/openai.md
@@ -701,8 +703,8 @@ Before running your first analysis:
 - [ ] Dependencies are installed (`pip install -r requirements.txt`)
 - [ ] Test basic command: `python3 src/main.py version`
 - [ ] Ingest a subsystem: `python3 src/main.py pipeline fs/ext4`
-- [ ] Try standard analysis: `python3 src/main.py analyze ext4_map_blocks`
-- [ ] Try LLM analysis: `python3 src/main.py analyze ext4_map_blocks --llm`
+- [ ] Try standard analysis: `python3 src/main.py analyze show_val_kb`
+- [ ] Try LLM analysis: `python3 src/main.py analyze show_val_kb --llm`
 
 ---
 
