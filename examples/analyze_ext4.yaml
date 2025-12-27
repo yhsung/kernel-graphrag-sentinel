@@ -1,0 +1,19 @@
+analysis:
+  include_indirect_calls: true
+  max_call_depth: 3
+  max_results: 100
+kernel:
+  root: /workspaces/ubuntu/linux-6.13
+  subsystem: fs/ext4
+llm:
+  api_key: null
+  model: gpt-4
+  provider: openai
+  temperature: 0.7
+neo4j:
+  password: '***'
+  url: bolt://localhost:7687
+  user: neo4j
+preprocessing:
+  enable_cpp: false
+  kernel_config: null
