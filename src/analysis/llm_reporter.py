@@ -173,16 +173,17 @@ Be specific with file paths, commands, and line numbers. Use tables and checkbox
     def _init_gemini(self):
         """Initialize Google Gemini client."""
         try:
-            from google import genai
+            import google.generativeai as genai
 
             api_key = self.config.api_key or os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError("Gemini API key not found. Set GEMINI_API_KEY environment variable.")
 
-            self.client = genai.Client(api_key=api_key)
+            genai.configure(api_key=api_key)
+            self.client = genai.GenerativeModel(self.config.model)
             logger.info(f"Initialized Gemini client with model: {self.config.model}")
         except ImportError:
-            raise ImportError("google-genai not installed. Run: pip install google-genai")
+            raise ImportError("google-generativeai not installed. Run: pip install google-generativeai")
 
     def _init_openai(self):
         """Initialize OpenAI client."""
@@ -474,16 +475,18 @@ Generate a comprehensive impact analysis report in {format} format following the
     def _call_gemini(self, prompt: str) -> str:
         """Call Google Gemini API."""
         try:
-            from google import genai
+            import google.generativeai as genai
 
-            # Gemini 2.0/3.0 Flash supports up to 8192 output tokens
-            response = self.client.models.generate_content(
-                model=self.config.model,
-                contents=prompt,
-                config=genai.GenerateContentConfig(
-                    temperature=self.config.temperature,
-                    max_output_tokens=8192,
-                )
+            # Configure generation parameters
+            generation_config = genai.types.GenerationConfig(
+                temperature=self.config.temperature,
+                max_output_tokens=8192,
+            )
+
+            # Generate content
+            response = self.client.generate_content(
+                prompt,
+                generation_config=generation_config
             )
             return response.text
         except Exception as e:
