@@ -2,7 +2,7 @@
 
 **AI-Powered Linux Kernel Code Analysis & Impact Assessment**
 
-Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kernel C code, builds comprehensive call graphs in Neo4j, maps test coverage, and provides AI-powered impact analysis for code changes.
+Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kernel C code, builds comprehensive call graphs in Neo4j, tracks data flows, maps test coverage, and provides AI-powered impact analysis for code changes. Now with **data flow analysis** for security research and vulnerability detection.
 
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Neo4j](https://img.shields.io/badge/neo4j-5.14+-green.svg)](https://neo4j.com/)
@@ -12,15 +12,30 @@ Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kerne
 
 ## 🎯 Features
 
+### Core Analysis (v0.1.0)
 - **📊 Call Graph Analysis**: Multi-hop function call chain traversal (up to N hops)
 - **📈 Call Graph Visualization**: Export call graphs in Mermaid, Graphviz DOT, and JSON formats
 - **🧪 Test Coverage Mapping**: Automatic KUnit test-to-function mapping
 - **🔍 Impact Assessment**: Analyze the impact of modifying any kernel function
-- **🤖 LLM-Powered Reports**: AI-generated natural language impact analysis with embedded Mermaid diagrams (Gemini, OpenAI, Anthropic, Ollama)
+- **🤖 LLM-Powered Reports**: AI-generated natural language impact analysis with embedded Mermaid diagrams
 - **⚡ Risk Evaluation**: Identify critical uncovered functions
+
+### Data Flow Analysis (v0.2.0) ⭐ NEW
+- **🔄 Variable Tracking**: Extract and track all variables (parameters, locals, globals)
+- **📍 Data Flow Analysis**: Intra-procedural flow tracking (assignments, operations, returns)
+- **🔒 Security Analysis**: Taint analysis, buffer overflow detection, dead code identification
+- **🗺️ Flow Visualization**: Neo4j-based data flow graphs with Cypher queries
+- **🔎 Dependency Analysis**: Understand variable dependencies and data propagation
+
+### LLM Support (Enhanced in v0.2.0)
+- **5 LLM Providers**: OpenAI, Google Gemini, Anthropic Claude, Ollama, **LM Studio** (GUI local LLM)
+- **Structured Reports**: Professional 10-section reports with call graph diagrams
+- **FREE Options**: Ollama and LM Studio for unlimited local usage
+
+### Infrastructure
 - **🌳 Tree-sitter Parsing**: Accurate C code AST extraction with macro preprocessing
 - **🗄️ Neo4j Graph Database**: Efficient storage and querying of code relationships
-- **🖥️ CLI Interface**: User-friendly command-line tool
+- **🖥️ CLI Interface**: User-friendly command-line tool with 8+ commands
 - **📝 YAML Configuration**: Flexible configuration management
 - **🔧 Subsystem Auto-detection**: Automatic detection of kernel subsystem boundaries
 
@@ -42,6 +57,13 @@ Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kerne
         └───────────────┬─────────────────┘
                         │ (Functions, Calls)
         ┌───────────────▼─────────────────┐
+        │  Module D: Data Flow Analysis    │ ⭐ NEW in v0.2.0
+        │  • Variable tracking             │
+        │  • Flow graph building           │
+        │  • Security pattern detection    │
+        └───────────────┬─────────────────┘
+                        │ (Variables, Flows)
+        ┌───────────────▼─────────────────┐
         │  Module B: Graph Database        │
         │  • Neo4j storage                 │
         │  • Node/relationship management  │
@@ -58,9 +80,10 @@ Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kerne
         ┌───────────────▼─────────────────┐
         │  Impact Analysis Module          │
         │  • Multi-hop call traversal      │
+        │  • Data flow analysis            │
         │  • Test coverage assessment      │
         │  • Risk level calculation        │
-        │  • Report generation             │
+        │  • LLM-powered report generation │
         └──────────────────────────────────┘
 ```
 
@@ -219,11 +242,74 @@ RISK ASSESSMENT
 
 **LLM-Powered Output Example:**
 
-See comprehensive example reports in `examples/reports/` directory comparing 4 LLM providers:
+See comprehensive example reports in `docs/examples/reports/` directory comparing 5 LLM providers:
 - **Anthropic Claude Haiku 4-5** (203 lines) - Best quality, recommended for production
 - **OpenAI GPT-5 Mini** (171 lines) - Most comprehensive OpenAI model
 - **Gemini 3.0 Pro** (74 lines) - Balanced speed and quality, free tier
 - **Ollama Qwen3-VL 30B** (150 lines) - Unlimited local usage
+- **LM Studio** (local model) - FREE GUI-based local LLM ⭐ NEW
+
+#### 4. **Data Flow Analysis** ⭐ NEW in v0.2.0
+
+Track variables and analyze data flows for security research:
+
+```bash
+# Ingest data flow information for a subsystem
+python3 src/main.py ingest-dataflow fs/ext4
+
+# Analyze variable data flows
+python3 src/main.py dataflow inode --max-depth 5 --direction both
+
+# Track specific variable in a function
+python3 src/main.py dataflow buffer --function ext4_file_write_iter
+
+# Query data flows directly
+python3 src/main.py query "
+MATCH (v:Variable {is_parameter: true})
+WHERE v.scope = 'ext4_file_write_iter'
+RETURN v.name, v.var_type
+"
+```
+
+**Security Analysis Examples:**
+
+```bash
+# 1. Taint Analysis - Find user-controlled input flows
+python3 src/main.py query "
+MATCH path = (source:Variable)-[:FLOWS_TO*1..7]->(sink:Variable)
+WHERE source.name =~ '.*user.*'
+RETURN source.scope, source.name, sink.name, length(path) as depth
+ORDER BY depth LIMIT 20
+"
+
+# 2. Buffer Tracking - Find buffer variables and sizes
+python3 src/main.py query "
+MATCH (buf:Variable), (size:Variable)
+WHERE buf.var_type CONTAINS 'char'
+  AND size.name =~ '.*size.*|.*len.*'
+  AND buf.scope = size.scope
+RETURN buf.scope, buf.name, size.name
+"
+
+# 3. Dead Variable Detection - Find unused variables
+python3 src/main.py query "
+MATCH (v:Variable)
+WHERE NOT (v)-[:USES]->() AND NOT (v)-[:FLOWS_TO]->()
+  AND v.is_parameter = false
+RETURN v.name, v.scope, v.file_path
+LIMIT 50
+"
+```
+
+**Output:**
+- Variable definitions and uses extracted
+- Data flow relationships mapped
+- Security patterns identified
+- Neo4j graph ready for complex queries
+
+**Documentation:**
+- [Data Flow Analysis Guide](docs/dataflow_analysis_guide.md) - Complete user guide
+- [Query Examples](docs/examples/dataflow_query_examples.md) - 22 practical Cypher queries
 
 Sample output (Anthropic Claude):
 ```markdown
