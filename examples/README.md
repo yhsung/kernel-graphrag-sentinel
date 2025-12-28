@@ -10,7 +10,8 @@ This directory contains example configurations, LLM-generated reports, and query
 examples/
 ├── README.md                    # This file - comprehensive documentation index
 ├── analyze_ext4.yaml            # Example configuration for ext4 analysis
-├── query_examples.md            # 30+ Neo4j Cypher query examples
+├── query_examples.md            # 30+ Neo4j Cypher query examples (v0.1.0)
+├── dataflow_example.py          # Data flow analysis example script (v0.2.0)
 ├── show_val_kb-callgraph.md     # Example call graph visualization (Mermaid)
 └── reports/                     # LLM-generated and rule-based reports
     ├── rule-based-report.md              # Non-LLM baseline (38 lines)
@@ -40,6 +41,37 @@ examples/
 - Related commands for other export formats
 
 **View this file:** See the rendered Mermaid diagram on GitHub/GitLab or in VS Code with Mermaid extension
+
+### Python Script Examples
+
+#### `dataflow_example.py` (v0.2.0)
+**Purpose:** Demonstrates Module D data flow analysis capabilities
+
+**Contents:**
+- Example 1: Variable tracking - Extract variable definitions and uses
+- Example 2: Data flow graph building - Build intra-procedural flows
+- Example 3: Neo4j ingestion - Store data flows in graph database
+
+**Usage:**
+```bash
+# Run all examples
+python3 examples/dataflow_example.py
+
+# Requires:
+# - Sample C files in tests/fixtures/
+# - Optional: Neo4j running for Example 3
+```
+
+**Key Features:**
+- Shows how to use `VariableTracker` to extract variables
+- Demonstrates `FlowBuilder` for data flow analysis
+- Includes Neo4j `DataFlowIngestion` example with schema setup
+- Provides example Cypher queries for data flow analysis
+
+**Output Examples:**
+- Variable definitions with types, scopes, and flags (parameter, pointer)
+- Data flow edges showing assignments and return flows
+- Graph statistics (variable counts, flow edges)
 
 ### Configuration Examples
 
