@@ -9,9 +9,11 @@ from .flow_schema import (
     VariableNode,
     DataSourceNode,
     FlowRelationship,
+    FlowType,
     get_variable_node_query,
     get_flow_relationship_query,
 )
+from .flow_ingestion import DataFlowIngestion
 
 __all__ = [
     "VariableTracker",
@@ -23,6 +25,8 @@ __all__ = [
     "VariableNode",
     "DataSourceNode",
     "FlowRelationship",
+    "FlowType",
     "get_variable_node_query",
     "get_flow_relationship_query",
+    "DataFlowIngestion",
 ]

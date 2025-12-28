@@ -70,6 +70,11 @@ class VariableTracker:
         with open(source_file, "r", encoding="utf-8", errors="ignore") as f:
             code = f.read()
 
+        # Handle empty files
+        if not code or not code.strip():
+            logger.info(f"File {source_file} is empty, returning no variables")
+            return [], []
+
         root = self.parser.parse(code)
 
         # Extract global variables
@@ -268,7 +273,34 @@ class VariableTracker:
 
         # Find declarators (actual variable names)
         for child in decl_node.children:
-            if "declarator" in child.type:
+            # Handle init_declarator (int x = 10;)
+            if child.type == "init_declarator":
+                declarator = child.child_by_field_name("declarator")
+                value = child.child_by_field_name("value")
+
+                if declarator:
+                    var_name = self._extract_variable_name(declarator, code)
+                    if var_name:
+                        is_pointer = self._is_pointer_type(declarator, code)
+                        initializer = None
+                        if value:
+                            initializer = code[value.start_byte : value.end_byte]
+
+                        var_def = VariableDefinition(
+                            name=var_name,
+                            var_type=var_type,
+                            scope=scope,
+                            file_path=file_path,
+                            line_number=declarator.start_point[0] + 1,
+                            is_parameter=False,
+                            is_pointer=is_pointer,
+                            is_static=is_static,
+                            initializer=initializer,
+                        )
+                        variables.append(var_def)
+
+            # Handle plain declarator (int x;)
+            elif "declarator" in child.type:
                 var_def = self._parse_declarator(
                     child, var_type, scope, file_path, code, is_static
                 )
