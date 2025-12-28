@@ -63,6 +63,15 @@ def mock_neo4j_session(mock_neo4j_driver):
 
 
 @pytest.fixture
+def mock_neo4j_graph_store():
+    """Provide a mock Neo4jGraphStore."""
+    store = MagicMock()
+    store.execute_query.return_value = []
+    store.get_statistics.return_value = {"functions": 0, "relationships": 0}
+    return store
+
+
+@pytest.fixture
 def sample_function_data() -> dict:
     """Provide sample function data for testing."""
     return {

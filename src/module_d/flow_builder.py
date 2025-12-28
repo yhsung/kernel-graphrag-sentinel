@@ -72,6 +72,11 @@ class FlowBuilder:
         with open(source_file, "r", encoding="utf-8", errors="ignore") as f:
             code = f.read()
 
+        # Handle empty files
+        if not code or not code.strip():
+            logger.info(f"File {source_file} is empty, returning no flows")
+            return [], {}
+
         root = self.parser.parse(code)
 
         all_flows = []
@@ -109,6 +114,11 @@ class FlowBuilder:
         # Read and parse file
         with open(source_file, "r", encoding="utf-8", errors="ignore") as f:
             code = f.read()
+
+        # Handle empty files
+        if not code or not code.strip():
+            logger.info(f"File {source_file} is empty, returning no flows")
+            return []
 
         root = self.parser.parse(code)
 
