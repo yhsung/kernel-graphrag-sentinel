@@ -7,10 +7,16 @@ import os
 import logging
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
+from pathlib import Path
 
 from .graph_exporter import GraphExporter
 
 logger = logging.getLogger(__name__)
+
+# Path to system prompt files
+DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
+SYSTEM_PROMPT_FILE = DOCS_DIR / "llm_report_system_prompt.md"
+AUTOMOTIVE_PROMPT_FILE = DOCS_DIR / "llm_automotive_safety_prompt.md"
 
 
 @dataclass
@@ -38,6 +44,10 @@ class LLMReporter:
         self.graph_store = graph_store
         self.graph_exporter = GraphExporter(graph_store) if graph_store else None
 
+        # Load system prompts (KV-cache optimized)
+        self._system_prompt_base = self._load_system_prompt()
+        self._automotive_extension = self._load_automotive_prompt()
+
         # Initialize appropriate client
         if config.provider == "gemini":
             self._init_gemini()
@@ -51,6 +61,112 @@ class LLMReporter:
             self._init_lmstudio()
         else:
             raise ValueError(f"Unsupported LLM provider: {config.provider}")
+
+    def _load_system_prompt(self) -> str:
+        """Load base system prompt from documentation file."""
+        try:
+            if not SYSTEM_PROMPT_FILE.exists():
+                logger.warning(f"System prompt file not found: {SYSTEM_PROMPT_FILE}, using fallback")
+                return self._get_fallback_system_prompt()
+
+            with open(SYSTEM_PROMPT_FILE, 'r') as f:
+                content = f.read()
+
+            # Extract content between ``` markers
+            start = content.find("```\n")
+            if start == -1:
+                logger.warning("Could not find system prompt markers, using fallback")
+                return self._get_fallback_system_prompt()
+
+            start += 4  # Skip past ```\n
+            end = content.rfind("\n```")
+            if end == -1:
+                logger.warning("Could not find closing prompt marker, using fallback")
+                return self._get_fallback_system_prompt()
+
+            system_prompt = content[start:end]
+            logger.info(f"Loaded system prompt from {SYSTEM_PROMPT_FILE} ({len(system_prompt)} chars)")
+            return system_prompt
+
+        except Exception as e:
+            logger.error(f"Failed to load system prompt: {e}, using fallback")
+            return self._get_fallback_system_prompt()
+
+    def _load_automotive_prompt(self) -> str:
+        """Load automotive safety extension prompt."""
+        try:
+            if not AUTOMOTIVE_PROMPT_FILE.exists():
+                logger.warning(f"Automotive prompt file not found: {AUTOMOTIVE_PROMPT_FILE}")
+                return ""
+
+            with open(AUTOMOTIVE_PROMPT_FILE, 'r') as f:
+                content = f.read()
+
+            # Extract Section 11 content
+            start = content.find("## 11. AUTOMOTIVE SAFETY ANALYSIS")
+            if start == -1:
+                logger.warning("Could not find automotive section marker")
+                return ""
+
+            end = content.find("# End of Automotive Safety Extension")
+            if end == -1:
+                logger.warning("Could not find automotive section end marker")
+                return ""
+
+            automotive_section = content[start:end].strip()
+            logger.info(f"Loaded automotive extension ({len(automotive_section)} chars)")
+            return automotive_section
+
+        except Exception as e:
+            logger.error(f"Failed to load automotive prompt: {e}")
+            return ""
+
+    def _get_fallback_system_prompt(self) -> str:
+        """Fallback system prompt if file loading fails."""
+        return """You are a Linux kernel code analysis expert specializing in impact analysis and risk assessment. Your task is to generate comprehensive, professional impact analysis reports for developers planning to modify Linux kernel code.
+
+Generate reports with these sections:
+1. Header with risk level (🟢 LOW, 🟡 MEDIUM, 🔴 HIGH, ⚫ CRITICAL)
+2. Executive Summary
+3. Code Impact Analysis (with Mermaid diagram if provided)
+4. Testing Requirements
+5. Recommended New Tests
+6. Risk Assessment
+7. Implementation Recommendations
+8. Escalation Criteria
+9. Recommendations Summary
+10. Conclusion
+
+Be specific with file paths, commands, and line numbers. Use tables and checkboxes. Prioritize with CRITICAL/HIGH/MEDIUM/LOW."""
+
+    def _is_automotive_context(self, context: str) -> bool:
+        """Detect if context requires automotive safety analysis."""
+        automotive_keywords = [
+            "automotive", "embedded", "real-time", "safety-critical",
+            "iso 26262", "iso 21434", "aspice", "asil",
+            "ecu", "autosar", "misra", "functional safety",
+            "wcet", "timing analysis", "hard real-time"
+        ]
+        context_lower = context.lower()
+        is_automotive = any(keyword in context_lower for keyword in automotive_keywords)
+
+        if is_automotive:
+            logger.info("Automotive context detected, will include safety analysis section")
+
+        return is_automotive
+
+    def _build_system_prompt(self, context: str) -> str:
+        """Build system prompt with optional automotive extension (KV-cache optimized)."""
+        system_prompt = self._system_prompt_base
+
+        # Append automotive extension if needed
+        if self._is_automotive_context(context):
+            if self._automotive_extension:
+                system_prompt += "\n\n" + self._automotive_extension
+            else:
+                logger.warning("Automotive context detected but extension not loaded")
+
+        return system_prompt
 
     def _init_gemini(self):
         """Initialize Google Gemini client."""
@@ -310,124 +426,9 @@ class LLMReporter:
         return "\n".join(lines)
 
     def _create_prompt(self, context: str, function_name: str, format: str) -> str:
-        """Create prompt for LLM using structured system prompt."""
-        # Professional system prompt based on high-quality Anthropic reports
-        system_prompt = """You are a Linux kernel code analysis expert specializing in impact analysis and risk assessment. Your task is to generate comprehensive, professional impact analysis reports for developers planning to modify Linux kernel code.
-
-# Report Structure
-
-Generate reports following this exact structure:
-
-## 1. HEADER SECTION
-- Report title: "Impact Analysis Report: `<function_name>()` Function Modification"
-- File path and function name
-- Report date
-- Risk level with color-coded emoji:
-  - 🟢 LOW: Isolated changes, good test coverage, minimal dependencies
-  - 🟡 MEDIUM: Moderate impact, some test coverage, standard dependencies
-  - 🔴 HIGH: Public interfaces, no tests, or high call frequency
-  - ⚫ CRITICAL: Core infrastructure, ABI/API changes, system-wide impact
-
-## 2. EXECUTIVE SUMMARY (2-3 sentences)
-Concise overview covering:
-- Function's role and importance
-- Test coverage status
-- Key risk factors
-- Nature of the interface (internal/public)
-
-## 3. CODE IMPACT ANALYSIS
-
-### 3.1 Affected Components Table
-| Component | Impact | Details |
-|-----------|--------|---------|
-| **Direct Callers** | [LOW/MEDIUM/HIGH] | Number and description |
-| **Indirect Callers** | [LOW/MEDIUM/HIGH] | Depth and breadth of impact |
-| **Public Interface** | [NONE/LOW/CRITICAL] | User-facing implications |
-| **Dependent Code** | [LOW/MEDIUM/HIGH] | External dependencies |
-
-### 3.2 Scope of Change
-- Entry points count
-- Call sites frequency
-- Abstraction layers
-- Visibility (internal/external/public)
-
-### 3.3 Call Graph Visualization
-**IMPORTANT:** If a Mermaid diagram is provided in the context (look for "CALL GRAPH VISUALIZATION" section), you MUST include it here exactly as provided to visualize the function's relationships:
-
-```mermaid
-[Copy the exact Mermaid diagram from the context - look for the diagram between the separator lines]
-```
-
-The diagram shows:
-- The target function (highlighted)
-- Direct callers (functions that call this function)
-- Direct callees (functions this function calls)
-- Relationship hierarchy and dependencies
-
-This visualization is critical for understanding the impact scope at a glance.
-
-## 4. TESTING REQUIREMENTS
-
-### 4.1 Existing Test Coverage
-Use checkmarks and warning symbols:
-- ✅ Direct unit tests found
-- ✅ Integration tests identified
-- ❌ No direct tests
-- ⚠️ Partial coverage
-
-### 4.2 Mandatory Tests to Run
-Provide specific, executable commands organized by category:
-
-#### Functional Tests
-```bash
-# Concrete commands to verify functionality
-```
-
-#### Regression Tests
-- Specific test paths or commands
-- Subsystem-specific tests
-
-## 5. RECOMMENDED NEW TESTS
-
-### 5.1 Unit Tests (Priority Level)
-Provide specific test case names and purposes:
-```c
-// Concrete test cases needed
-```
-
-## 6. RISK ASSESSMENT
-
-### Risk Level: [Emoji] [LEVEL]
-
-**Justification Table:**
-| Risk Factor | Severity | Reason |
-|------------|----------|--------|
-| **[Factor]** | [LEVEL] | Specific reason |
-
-### Potential Failure Modes
-Enumerate 3-5 specific failure scenarios with consequences.
-
-## 7. IMPLEMENTATION RECOMMENDATIONS
-
-### Phase-by-Phase Checklist
-Organize as actionable phases with checkboxes (Phase 1-4: Preparation, Development, Testing, Validation).
-
-## 8. ESCALATION CRITERIA
-**Stop and escalate if:** List specific conditions.
-
-## 9. RECOMMENDATIONS SUMMARY
-Table with Priority, Action, Owner columns.
-
-## 10. CONCLUSION
-2-3 sentences with clear recommendation.
-
-# Writing Guidelines
-- Be specific with file paths, commands, line numbers
-- Be actionable with executable commands
-- Use tables, checkboxes, clear formatting
-- Prioritize with CRITICAL/HIGH/MEDIUM/LOW
-- Focus on "why" not just "what"
-- Professional, direct, risk-aware tone"""
+        """Create prompt for LLM using KV-cache optimized system prompt."""
+        # Build system prompt with optional automotive extension
+        system_prompt = self._build_system_prompt(context)
 
         # User message with impact analysis data
         user_message = f"""Analyze this Linux kernel function modification:
@@ -538,17 +539,51 @@ Generate a comprehensive impact analysis report in {format} format following the
             raise
 
     def _call_anthropic_with_system(self, system_msg: str, user_msg: str) -> str:
-        """Call Anthropic Claude API with system and user messages."""
+        """Call Anthropic Claude API with system and user messages (with prompt caching)."""
         try:
+            # Determine max_tokens based on model
+            # Sonnet 4.5 supports up to 16K output tokens for comprehensive reports
+            # Haiku supports 8K output tokens
+            if "sonnet" in self.config.model.lower():
+                max_tokens = 16384  # 16K for comprehensive reports with automotive section
+            elif "haiku" in self.config.model.lower():
+                max_tokens = 8192   # 8K for Haiku
+            else:
+                max_tokens = 4096   # Conservative default
+
+            # Use prompt caching for system message to reduce costs
+            # System message format: [{"type": "text", "text": "...", "cache_control": {"type": "ephemeral"}}]
             response = self.client.messages.create(
                 model=self.config.model,
-                max_tokens=4096,  # Increased for detailed reports
+                max_tokens=max_tokens,
                 temperature=self.config.temperature,
-                system=system_msg,  # Anthropic uses 'system' parameter
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_msg,
+                        "cache_control": {"type": "ephemeral"}  # Cache the system prompt
+                    }
+                ],
                 messages=[
                     {"role": "user", "content": user_msg}
                 ]
             )
+
+            # Log cache performance metrics
+            usage = response.usage
+            cache_creation = getattr(usage, 'cache_creation_input_tokens', 0)
+            cache_read = getattr(usage, 'cache_read_input_tokens', 0)
+            input_tokens = usage.input_tokens
+
+            if cache_creation > 0:
+                logger.info(f"Cache MISS - Created cache: {cache_creation} tokens")
+            if cache_read > 0:
+                cache_hit_rate = (cache_read / input_tokens * 100) if input_tokens > 0 else 0
+                logger.info(f"Cache HIT - Read {cache_read} tokens ({cache_hit_rate:.1f}% cache hit rate)")
+
+            logger.debug(f"Token usage - Input: {input_tokens}, Output: {usage.output_tokens}, "
+                        f"Cache creation: {cache_creation}, Cache read: {cache_read}")
+
             return response.content[0].text
         except Exception as e:
             logger.error(f"Anthropic API call failed: {e}")
