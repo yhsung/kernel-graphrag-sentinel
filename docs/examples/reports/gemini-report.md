@@ -1,0 +1,1 @@
+Error generating LLM report: module 'google.genai' has no attribute 'GenerateContentConfig'

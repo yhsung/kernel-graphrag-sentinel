@@ -72,14 +72,14 @@ class LLMReporter:
             with open(SYSTEM_PROMPT_FILE, 'r') as f:
                 content = f.read()
 
-            # Extract content between ``` markers
-            start = content.find("```\n")
+            # Extract content between # Start of System Prompt markers
+            start = content.find("# Start of System Prompt\n")
             if start == -1:
                 logger.warning("Could not find system prompt markers, using fallback")
                 return self._get_fallback_system_prompt()
 
-            start += 4  # Skip past ```\n
-            end = content.rfind("\n```")
+            start += 4  # Skip past \n# End of System Prompt
+            end = content.rfind("\n# End of System Prompt")
             if end == -1:
                 logger.warning("Could not find closing prompt marker, using fallback")
                 return self._get_fallback_system_prompt()
@@ -152,6 +152,8 @@ Be specific with file paths, commands, and line numbers. Use tables and checkbox
 
         if is_automotive:
             logger.info("Automotive context detected, will include safety analysis section")
+        else:
+            logger.info("No Automotive context detected, will exclude safety analysis section")
 
         return is_automotive
 
