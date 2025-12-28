@@ -220,36 +220,148 @@ class LLMReporter:
         return "\n".join(lines)
 
     def _create_prompt(self, context: str, function_name: str, format: str) -> str:
-        """Create prompt for LLM."""
-        prompt = f"""You are analyzing Linux kernel code changes. A developer is planning to modify the function `{function_name}`.
+        """Create prompt for LLM using structured system prompt."""
+        # Professional system prompt based on high-quality Anthropic reports
+        system_prompt = """You are a Linux kernel code analysis expert specializing in impact analysis and risk assessment. Your task is to generate comprehensive, professional impact analysis reports for developers planning to modify Linux kernel code.
 
-Based on the following impact analysis data, generate a comprehensive, professional report that helps the developer understand:
-1. What code will be affected by this change
-2. What tests need to be run
-3. What new tests might be needed
-4. The overall risk level and why
-5. Recommendations for safely implementing this change
+# Report Structure
+
+Generate reports following this exact structure:
+
+## 1. HEADER SECTION
+- Report title: "Impact Analysis Report: `<function_name>()` Function Modification"
+- File path and function name
+- Report date
+- Risk level with color-coded emoji:
+  - 🟢 LOW: Isolated changes, good test coverage, minimal dependencies
+  - 🟡 MEDIUM: Moderate impact, some test coverage, standard dependencies
+  - 🔴 HIGH: Public interfaces, no tests, or high call frequency
+  - ⚫ CRITICAL: Core infrastructure, ABI/API changes, system-wide impact
+
+## 2. EXECUTIVE SUMMARY (2-3 sentences)
+Concise overview covering:
+- Function's role and importance
+- Test coverage status
+- Key risk factors
+- Nature of the interface (internal/public)
+
+## 3. CODE IMPACT ANALYSIS
+
+### 3.1 Affected Components Table
+| Component | Impact | Details |
+|-----------|--------|---------|
+| **Direct Callers** | [LOW/MEDIUM/HIGH] | Number and description |
+| **Indirect Callers** | [LOW/MEDIUM/HIGH] | Depth and breadth of impact |
+| **Public Interface** | [NONE/LOW/CRITICAL] | User-facing implications |
+| **Dependent Code** | [LOW/MEDIUM/HIGH] | External dependencies |
+
+### 3.2 Scope of Change
+- Entry points count
+- Call sites frequency
+- Abstraction layers
+- Visibility (internal/external/public)
+
+Include the call graph visualization if provided in the context.
+
+## 4. TESTING REQUIREMENTS
+
+### 4.1 Existing Test Coverage
+Use checkmarks and warning symbols:
+- ✅ Direct unit tests found
+- ✅ Integration tests identified
+- ❌ No direct tests
+- ⚠️ Partial coverage
+
+### 4.2 Mandatory Tests to Run
+Provide specific, executable commands organized by category:
+
+#### Functional Tests
+```bash
+# Concrete commands to verify functionality
+```
+
+#### Regression Tests
+- Specific test paths or commands
+- Subsystem-specific tests
+
+## 5. RECOMMENDED NEW TESTS
+
+### 5.1 Unit Tests (Priority Level)
+Provide specific test case names and purposes:
+```c
+// Concrete test cases needed
+```
+
+## 6. RISK ASSESSMENT
+
+### Risk Level: [Emoji] [LEVEL]
+
+**Justification Table:**
+| Risk Factor | Severity | Reason |
+|------------|----------|--------|
+| **[Factor]** | [LEVEL] | Specific reason |
+
+### Potential Failure Modes
+Enumerate 3-5 specific failure scenarios with consequences.
+
+## 7. IMPLEMENTATION RECOMMENDATIONS
+
+### Phase-by-Phase Checklist
+Organize as actionable phases with checkboxes (Phase 1-4: Preparation, Development, Testing, Validation).
+
+## 8. ESCALATION CRITERIA
+**Stop and escalate if:** List specific conditions.
+
+## 9. RECOMMENDATIONS SUMMARY
+Table with Priority, Action, Owner columns.
+
+## 10. CONCLUSION
+2-3 sentences with clear recommendation.
+
+# Writing Guidelines
+- Be specific with file paths, commands, line numbers
+- Be actionable with executable commands
+- Use tables, checkboxes, clear formatting
+- Prioritize with CRITICAL/HIGH/MEDIUM/LOW
+- Focus on "why" not just "what"
+- Professional, direct, risk-aware tone"""
+
+        # User message with impact analysis data
+        user_message = f"""Analyze this Linux kernel function modification:
+
+Function: {function_name}
 
 Impact Analysis Data:
 {context}
 
-Generate a clear, well-structured report in {format} format. Be concise but thorough. Focus on actionable insights.
+Generate a comprehensive impact analysis report in {format} format following the structured template."""
 
-Report:"""
-        return prompt
+        # Return both parts (system + user) as a single prompt for compatibility
+        # Some providers will use this in messages array, others as single prompt
+        return f"{system_prompt}\n\n---\n\n{user_message}"
 
     def _call_llm(self, prompt: str) -> str:
         """Call the LLM API."""
+        # Extract system prompt and user message from combined prompt
+        # Format: "system_prompt\n\n---\n\nuser_message"
+        parts = prompt.split("\n\n---\n\n", 1)
+        if len(parts) == 2:
+            system_msg, user_msg = parts
+        else:
+            # Fallback: treat entire prompt as user message
+            system_msg = "You are a Linux kernel code analysis expert."
+            user_msg = prompt
+
         if self.config.provider == "gemini":
-            return self._call_gemini(prompt)
+            return self._call_gemini(user_msg)  # Gemini doesn't use system messages
         elif self.config.provider == "openai":
-            return self._call_openai(prompt)
+            return self._call_openai_with_system(system_msg, user_msg)
         elif self.config.provider == "anthropic":
-            return self._call_anthropic(prompt)
+            return self._call_anthropic_with_system(system_msg, user_msg)
         elif self.config.provider == "ollama":
-            return self._call_ollama(prompt)
+            return self._call_ollama(user_msg)  # Ollama uses simple prompt
         elif self.config.provider == "lmstudio":
-            return self._call_lmstudio(prompt)
+            return self._call_lmstudio_with_system(system_msg, user_msg)
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
@@ -272,8 +384,8 @@ Report:"""
             logger.error(f"Gemini API call failed: {e}")
             raise
 
-    def _call_openai(self, prompt: str) -> str:
-        """Call OpenAI API."""
+    def _call_openai_with_system(self, system_msg: str, user_msg: str) -> str:
+        """Call OpenAI API with system and user messages."""
         try:
             # Build request parameters
             # Reasoning models (gpt-5, o1) need more tokens as they use tokens for thinking
@@ -282,8 +394,8 @@ Report:"""
             params = {
                 "model": self.config.model,
                 "messages": [
-                    {"role": "system", "content": "You are a Linux kernel code analysis expert."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg}
                 ],
                 "max_completion_tokens": max_tokens
             }
@@ -308,8 +420,8 @@ Report:"""
                 response = self.client.chat.completions.create(
                     model=self.config.model,
                     messages=[
-                        {"role": "system", "content": "You are a Linux kernel code analysis expert."},
-                        {"role": "user", "content": prompt}
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": user_msg}
                     ],
                     max_completion_tokens=max_tokens
                 )
@@ -322,15 +434,16 @@ Report:"""
             logger.error(f"OpenAI API call failed: {e}")
             raise
 
-    def _call_anthropic(self, prompt: str) -> str:
-        """Call Anthropic Claude API."""
+    def _call_anthropic_with_system(self, system_msg: str, user_msg: str) -> str:
+        """Call Anthropic Claude API with system and user messages."""
         try:
             response = self.client.messages.create(
                 model=self.config.model,
-                max_tokens=2048,
+                max_tokens=4096,  # Increased for detailed reports
                 temperature=self.config.temperature,
+                system=system_msg,  # Anthropic uses 'system' parameter
                 messages=[
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": user_msg}
                 ]
             )
             return response.content[0].text
@@ -363,18 +476,18 @@ Report:"""
             logger.error(f"Ollama API call failed: {e}")
             raise
 
-    def _call_lmstudio(self, prompt: str) -> str:
+    def _call_lmstudio_with_system(self, system_msg: str, user_msg: str) -> str:
         """Call LM Studio (local LLM with OpenAI-compatible API)."""
         try:
             # LM Studio uses OpenAI-compatible API
             response = self.client.chat.completions.create(
                 model=self.config.model,
                 messages=[
-                    {"role": "system", "content": "You are a Linux kernel code analysis expert."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg}
                 ],
                 temperature=self.config.temperature,
-                max_tokens=2048
+                max_tokens=4096  # Increased for detailed reports
             )
             content = response.choices[0].message.content
             if not content:
