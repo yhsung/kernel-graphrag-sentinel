@@ -189,6 +189,90 @@ class LLMReporter:
             except Exception as e:
                 logger.warning(f"Failed to generate Mermaid diagram: {e}")
 
+        # Add Variable and Data Flow Analysis (Module D) if available
+        if self.graph_store:
+            try:
+                lines.append("=" * 60)
+                lines.append("VARIABLE INFORMATION (Data Flow Analysis)")
+                lines.append("=" * 60)
+                lines.append("")
+                lines.append("IMPORTANT: Include this data flow analysis in Section 3.4 of your report.")
+                lines.append("")
+
+                # Query for variables in this function
+                var_query = f'''
+                MATCH (v:Variable {{scope: "{function_name}"}})
+                RETURN v.name as name, v.type as type,
+                       v.is_parameter as is_param, v.is_pointer as is_ptr,
+                       v.is_static as is_static, v.line as line
+                ORDER BY v.is_parameter DESC, v.name
+                '''
+
+                variables = self.graph_store.execute_query(var_query)
+
+                if variables:
+                    # Group variables
+                    params = [v for v in variables if v.get('is_param')]
+                    locals_vars = [v for v in variables if not v.get('is_param')]
+
+                    lines.append(f"Function Signature Variables ({len(variables)} total):")
+                    lines.append("")
+
+                    if params:
+                        lines.append(f"Parameters ({len(params)}):")
+                        for p in params:
+                            ptr_str = '*' if p.get('is_ptr') else ''
+                            static_str = 'static ' if p.get('is_static') else ''
+                            type_str = p.get('type') or 'unknown'
+                            line_str = f" (line {p.get('line')})" if p.get('line') else ''
+                            lines.append(f"  - {static_str}{type_str}{ptr_str} {p['name']}{line_str}")
+                        lines.append("")
+
+                    if locals_vars:
+                        lines.append(f"Local Variables ({len(locals_vars)}):")
+                        for lv in locals_vars[:15]:  # Limit to first 15 locals
+                            ptr_str = '*' if lv.get('is_ptr') else ''
+                            static_str = 'static ' if lv.get('is_static') else ''
+                            type_str = lv.get('type') or 'unknown'
+                            line_str = f" (line {lv.get('line')})" if lv.get('line') else ''
+                            lines.append(f"  - {static_str}{type_str}{ptr_str} {lv['name']}{line_str}")
+                        if len(locals_vars) > 15:
+                            lines.append(f"  ... and {len(locals_vars) - 15} more local variables")
+                        lines.append("")
+
+                    # Pointer analysis for security
+                    pointers = [v for v in variables if v.get('is_ptr')]
+                    if pointers:
+                        lines.append(f"Pointer Variables Requiring NULL Checks ({len(pointers)}):")
+                        for ptr in pointers:
+                            type_str = ptr.get('type') or 'unknown'
+                            param_str = " [PARAMETER]" if ptr.get('is_param') else " [LOCAL]"
+                            lines.append(f"  - {type_str}* {ptr['name']}{param_str}")
+                        lines.append("")
+
+                    # Buffer/size variable correlation
+                    buffer_vars = [v for v in variables if any(kw in v['name'].lower()
+                                   for kw in ['buf', 'buffer', 'data', 'ptr'])]
+                    size_vars = [v for v in variables if any(kw in v['name'].lower()
+                                 for kw in ['size', 'len', 'length', 'count', 'num'])]
+
+                    if buffer_vars and size_vars:
+                        lines.append("Potential Buffer-Size Pairs (for overflow analysis):")
+                        for buf in buffer_vars[:5]:  # Limit to 5
+                            lines.append(f"  - Buffer: {buf['name']} (type: {buf.get('type', 'unknown')})")
+                        if size_vars:
+                            lines.append("  - Possible sizes: " + ", ".join(s['name'] for s in size_vars[:5]))
+                        lines.append("")
+                else:
+                    lines.append("No variable data available for this function.")
+                    lines.append("")
+
+                lines.append("=" * 60)
+                lines.append("")
+
+            except Exception as e:
+                logger.warning(f"Failed to fetch variable information: {e}")
+
         # Statistics
         stats = impact_data.get('stats', {})
         lines.append("Statistics:")
