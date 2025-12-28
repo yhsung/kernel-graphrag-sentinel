@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LLMConfig:
     """LLM configuration."""
-    provider: str  # openai, gemini, anthropic, ollama
+    provider: str  # openai, gemini, anthropic, ollama, lmstudio
     model: str
     api_key: Optional[str]
     temperature: float = 0.7
@@ -47,6 +47,8 @@ class LLMReporter:
             self._init_anthropic()
         elif config.provider == "ollama":
             self._init_ollama()
+        elif config.provider == "lmstudio":
+            self._init_lmstudio()
         else:
             raise ValueError(f"Unsupported LLM provider: {config.provider}")
 
@@ -103,10 +105,34 @@ class LLMReporter:
             if response.status_code != 200:
                 raise ConnectionError(f"Cannot connect to Ollama at {base_url}")
 
-            self.client = {"base_url": base_url, "model": self.config.model}
+            self.client = {"base_url": base_url, "model": self.config.model, "provider": "ollama"}
             logger.info(f"Initialized Ollama client with model: {self.config.model}")
         except ImportError:
             raise ImportError("requests not installed. Run: pip install requests")
+
+    def _init_lmstudio(self):
+        """Initialize LM Studio client (local LLM with OpenAI-compatible API)."""
+        try:
+            from openai import OpenAI
+
+            base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+
+            # Create OpenAI client pointing to LM Studio
+            self.client = OpenAI(
+                base_url=base_url,
+                api_key="lm-studio"  # LM Studio doesn't require a real API key
+            )
+
+            # Store additional metadata
+            self.client._lmstudio_metadata = {
+                "base_url": base_url,
+                "model": self.config.model,
+                "provider": "lmstudio"
+            }
+
+            logger.info(f"Initialized LM Studio client at {base_url} with model: {self.config.model}")
+        except ImportError:
+            raise ImportError("openai not installed. Run: pip install openai")
 
     def generate_impact_report(self, impact_data: Dict[str, Any],
                                function_name: str,
@@ -222,6 +248,8 @@ Report:"""
             return self._call_anthropic(prompt)
         elif self.config.provider == "ollama":
             return self._call_ollama(prompt)
+        elif self.config.provider == "lmstudio":
+            return self._call_lmstudio(prompt)
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
@@ -335,6 +363,28 @@ Report:"""
             logger.error(f"Ollama API call failed: {e}")
             raise
 
+    def _call_lmstudio(self, prompt: str) -> str:
+        """Call LM Studio (local LLM with OpenAI-compatible API)."""
+        try:
+            # LM Studio uses OpenAI-compatible API
+            response = self.client.chat.completions.create(
+                model=self.config.model,
+                messages=[
+                    {"role": "system", "content": "You are a Linux kernel code analysis expert."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=self.config.temperature,
+                max_tokens=2048
+            )
+            content = response.choices[0].message.content
+            if not content:
+                logger.warning(f"LM Studio returned empty content. Response: {response}")
+                return "Error: LM Studio returned empty response"
+            return content
+        except Exception as e:
+            logger.error(f"LM Studio API call failed: {e}")
+            raise
+
 
 # Convenience function
 def generate_llm_report(impact_result, provider: str = "gemini",
@@ -345,7 +395,7 @@ def generate_llm_report(impact_result, provider: str = "gemini",
 
     Args:
         impact_result: ImpactResult object from ImpactAnalyzer
-        provider: LLM provider (gemini, openai, anthropic, ollama)
+        provider: LLM provider (gemini, openai, anthropic, ollama, lmstudio)
         model: Model name
         api_key: API key (optional, uses env var if not provided)
 
@@ -383,7 +433,7 @@ def generate_llm_report(impact_result, provider: str = "gemini",
 if __name__ == "__main__":
     # Test LLM reporter
     print("LLM Reporter Module")
-    print("Available providers: gemini, openai, anthropic, ollama")
+    print("Available providers: gemini, openai, anthropic, ollama, lmstudio")
 
     # Example usage
     test_config = LLMConfig(

@@ -56,7 +56,7 @@ class AnalysisConfig:
 @dataclass
 class LLMConfig:
     """LLM provider configuration."""
-    provider: str = "openai"  # openai, gemini, ollama
+    provider: str = "openai"  # openai, gemini, anthropic, ollama, lmstudio
     model: str = "gpt-4"
     api_key: Optional[str] = None
     temperature: float = 0.7
@@ -139,6 +139,12 @@ class Config:
         elif provider == 'anthropic':
             default_key = os.getenv('ANTHROPIC_API_KEY')
             default_model = llm_data.get('model', os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022'))
+        elif provider == 'ollama':
+            default_key = None  # Ollama doesn't need API key
+            default_model = llm_data.get('model', os.getenv('OLLAMA_MODEL', 'llama3'))
+        elif provider == 'lmstudio':
+            default_key = None  # LM Studio doesn't need API key
+            default_model = llm_data.get('model', os.getenv('LMSTUDIO_MODEL', 'local-model'))
         else:  # openai or default
             default_key = os.getenv('OPENAI_API_KEY')
             default_model = llm_data.get('model', os.getenv('OPENAI_MODEL', 'gpt-4'))
@@ -197,6 +203,13 @@ class Config:
                 provider='ollama',
                 model=os.getenv('OLLAMA_MODEL', 'llama3'),
                 api_key=None,  # Ollama doesn't need API key
+                temperature=0.7
+            )
+        elif provider == 'lmstudio':
+            llm_config = LLMConfig(
+                provider='lmstudio',
+                model=os.getenv('LMSTUDIO_MODEL', 'local-model'),
+                api_key=None,  # LM Studio doesn't need API key
                 temperature=0.7
             )
         else:  # openai or unknown
