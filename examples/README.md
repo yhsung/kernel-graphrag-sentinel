@@ -11,6 +11,7 @@ examples/
 ├── README.md                    # This file - comprehensive documentation index
 ├── analyze_ext4.yaml            # Example configuration for ext4 analysis
 ├── query_examples.md            # 30+ Neo4j Cypher query examples
+├── show_val_kb-callgraph.md     # Example call graph visualization (Mermaid)
 └── reports/                     # LLM-generated and rule-based reports
     ├── rule-based-report.md              # Non-LLM baseline (38 lines)
     ├── anthropic-claude-haiku-4-5-report.md  # Anthropic (203 lines)
@@ -26,6 +27,19 @@ examples/
 ---
 
 ## 📄 File Descriptions
+
+### Visualization Examples
+
+#### `show_val_kb-callgraph.md`
+**Purpose:** Example call graph visualization in Mermaid format
+
+**Contents:**
+- Mermaid diagram showing callers of `show_val_kb`
+- Analysis of the call graph structure
+- Instructions for viewing and rendering
+- Related commands for other export formats
+
+**View this file:** See the rendered Mermaid diagram on GitHub/GitLab or in VS Code with Mermaid extension
 
 ### Configuration Examples
 
@@ -254,6 +268,143 @@ Quick reference for choosing the right provider:
 
 ---
 
+## 📊 Call Graph Visualization
+
+The `export-graph` command exports call graphs in multiple formats for visual analysis and documentation.
+
+### Mermaid Format (GitHub/VS Code Compatible)
+
+**Export to stdout:**
+```bash
+python3 src/main.py export-graph show_val_kb --format mermaid
+```
+
+**Output:**
+```mermaid
+graph TD
+    meminfo_proc_show["meminfo_proc_show"]
+    show_val_kb["show_val_kb"]
+    style show_val_kb fill:#f96,stroke:#333,stroke-width:4px
+    meminfo_proc_show --> show_val_kb
+```
+
+**Save to file:**
+```bash
+python3 src/main.py export-graph show_val_kb --format mermaid -o callgraph.md
+```
+
+**View the diagram:**
+- In GitHub: Include the .md file in your repository
+- In VS Code: Install Mermaid extension and preview
+- Online: Copy/paste to https://mermaid.live/
+
+### Graphviz DOT Format (Professional Rendering)
+
+**Export and render:**
+```bash
+# Export to DOT format
+python3 src/main.py export-graph show_val_kb --format dot -o show_val_kb.dot
+
+# Render to PNG (requires graphviz installed)
+dot -Tpng show_val_kb.dot -o show_val_kb.png
+
+# Render to SVG (scalable)
+dot -Tsvg show_val_kb.dot -o show_val_kb.svg
+
+# Render to PDF
+dot -Tpdf show_val_kb.dot -o show_val_kb.pdf
+```
+
+**Install Graphviz:**
+```bash
+# Ubuntu/Debian
+sudo apt-get install graphviz
+
+# macOS
+brew install graphviz
+```
+
+### JSON Format (Programmatic Analysis)
+
+**Export structured data:**
+```bash
+python3 src/main.py export-graph show_val_kb --format json
+```
+
+**Output:**
+```json
+{
+  "target_function": "show_val_kb",
+  "nodes": [
+    {
+      "id": "meminfo_proc_show",
+      "label": "meminfo_proc_show",
+      "file": "fs/proc/meminfo.c",
+      "subsystem": "unknown",
+      "is_target": false
+    },
+    {
+      "id": "show_val_kb",
+      "label": "show_val_kb",
+      "file": "fs/proc/meminfo.c",
+      "subsystem": "unknown",
+      "is_target": true
+    }
+  ],
+  "edges": [
+    {
+      "source": "meminfo_proc_show",
+      "target": "show_val_kb",
+      "depth": 1,
+      "type": "calls"
+    }
+  ],
+  "stats": {
+    "total_nodes": 2,
+    "total_edges": 1,
+    "unique_files": 1,
+    "unique_subsystems": 1
+  }
+}
+```
+
+### Advanced Options
+
+**Control graph depth:**
+```bash
+# Shallow graph (1 hop)
+python3 src/main.py export-graph ext4_map_blocks --max-depth 1 --format mermaid
+
+# Deep graph (5 hops)
+python3 src/main.py export-graph ext4_map_blocks --max-depth 5 --format mermaid
+```
+
+**Filter by direction:**
+```bash
+# Only show callers (who calls this function)
+python3 src/main.py export-graph show_val_kb --direction callers --format mermaid
+
+# Only show callees (what this function calls)
+python3 src/main.py export-graph ext4_map_blocks --direction callees --format mermaid
+
+# Both directions (default)
+python3 src/main.py export-graph show_val_kb --direction both --format mermaid
+```
+
+### LLM Reports with Embedded Diagrams
+
+**Automatic Mermaid diagrams in LLM reports:**
+
+When using the `--llm` flag, call graph visualizations are automatically embedded in the generated report:
+
+```bash
+python3 src/main.py analyze show_val_kb --llm --output report.md
+```
+
+The LLM receives the Mermaid diagram as context and includes it in the final report, providing visual context alongside the analysis.
+
+---
+
 ## 🚀 Quick Start Examples
 
 **Note:** All examples below use `show_val_kb` from `fs/proc/meminfo.c` as the demonstration function. This is the same function analyzed in all example reports in the `reports/` directory, making it easy to compare results across different LLM providers.
@@ -423,7 +574,32 @@ python3 src/main.py top-functions --limit 50
 # (Use Neo4j Cypher queries from query_examples.md)
 ```
 
-### Use Case 5: Batch Documentation Generation
+### Use Case 5: Call Graph Visualization for Documentation
+
+**Goal:** Generate visual call graphs for documentation
+
+```bash
+# Export Mermaid diagram for GitHub/GitLab wikis
+python3 src/main.py export-graph show_val_kb --format mermaid -o docs/callgraph-show_val_kb.md
+
+# Export Graphviz DOT and render to PNG
+python3 src/main.py export-graph ext4_map_blocks --format dot -o ext4_map_blocks.dot
+dot -Tpng ext4_map_blocks.dot -o docs/ext4_map_blocks-callgraph.png
+
+# Export JSON for custom web visualization
+python3 src/main.py export-graph ext4_free_blocks --format json -o viz/ext4_free_blocks.json
+
+# Generate deep call graph (5 hops)
+python3 src/main.py export-graph ext4_mb_new_blocks --max-depth 5 --format mermaid -o docs/ext4_mb_new_blocks-deep.md
+
+# Compare caller vs callee graphs
+python3 src/main.py export-graph show_val_kb --direction callers --format dot -o show_val_kb-callers.dot
+python3 src/main.py export-graph show_val_kb --direction callees --format dot -o show_val_kb-callees.dot
+dot -Tpng show_val_kb-callers.dot -o docs/show_val_kb-callers.png
+dot -Tpng show_val_kb-callees.dot -o docs/show_val_kb-callees.png
+```
+
+### Use Case 6: Batch Documentation Generation
 
 **Goal:** Generate documentation for all critical functions
 
@@ -676,6 +852,7 @@ To contribute new examples:
 
 **Current examples:**
 - Configuration files: 1
+- Visualization examples: 1 (show_val_kb-callgraph.md with Mermaid diagram)
 - Example reports: 10 total
   - 1 Rule-based (non-LLM) baseline
   - 9 LLM reports across 4 providers:
@@ -684,12 +861,12 @@ To contribute new examples:
     - Gemini: 3.0 Flash, 3.0 Pro, 2.5 Pro (3 models)
     - Ollama: Qwen3-VL 30B (1 model)
 - Query examples: 30+ Cypher queries
-- Total documentation: 4,000+ lines
+- Total documentation: 4,200+ lines
 
 **Documentation coverage:**
 - Main docs: 3,343 lines across 4 files
-- Examples: 650+ lines
-- README: Updated with Phase 7 status
+- Examples: 800+ lines
+- README: Updated with Phase 7 visualization features
 
 ---
 

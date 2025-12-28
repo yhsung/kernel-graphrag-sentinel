@@ -13,9 +13,10 @@ Kernel-GraphRAG Sentinel is an intelligent analysis tool that parses Linux kerne
 ## 🎯 Features
 
 - **📊 Call Graph Analysis**: Multi-hop function call chain traversal (up to N hops)
+- **📈 Call Graph Visualization**: Export call graphs in Mermaid, Graphviz DOT, and JSON formats
 - **🧪 Test Coverage Mapping**: Automatic KUnit test-to-function mapping
 - **🔍 Impact Assessment**: Analyze the impact of modifying any kernel function
-- **🤖 LLM-Powered Reports**: AI-generated natural language impact analysis (Gemini, OpenAI, Anthropic, Ollama)
+- **🤖 LLM-Powered Reports**: AI-generated natural language impact analysis with embedded Mermaid diagrams (Gemini, OpenAI, Anthropic, Ollama)
 - **⚡ Risk Evaluation**: Identify critical uncovered functions
 - **🌳 Tree-sitter Parsing**: Accurate C code AST extraction with macro preprocessing
 - **🗄️ Neo4j Graph Database**: Efficient storage and querying of code relationships
@@ -311,7 +312,48 @@ TOP CALLED FUNCTIONS (min 5 callers)
   3. ext4_map_blocks                  (22 calls) - inode.c
 ```
 
-#### 7. **Generate Configuration**
+#### 7. **Export Call Graph Visualization**
+
+Export call graphs in various formats for visualization:
+
+```bash
+# Export as Mermaid diagram (for GitHub, VS Code, documentation)
+python3 src/main.py export-graph show_val_kb --format mermaid
+
+# Export as Graphviz DOT format (for rendering with dot/graphviz)
+python3 src/main.py export-graph show_val_kb --format dot -o show_val_kb.dot
+# Render: dot -Tpng show_val_kb.dot -o show_val_kb.png
+
+# Export as JSON (for custom processing/visualization)
+python3 src/main.py export-graph show_val_kb --format json
+
+# Control graph depth and direction
+python3 src/main.py export-graph show_val_kb --max-depth 2 --direction callers
+python3 src/main.py export-graph show_val_kb --max-depth 3 --direction both
+```
+
+**Available Formats:**
+- `mermaid`: GitHub-compatible diagram syntax (view in VS Code, GitHub, or https://mermaid.live/)
+- `dot`: Graphviz DOT format for professional graph rendering
+- `json`: Structured data with nodes, edges, and statistics
+
+**Direction Options:**
+- `callers`: Show only functions that call the target
+- `callees`: Show only functions called by the target
+- `both`: Show both callers and callees (default)
+
+**Example Mermaid Output:**
+```mermaid
+graph TD
+    meminfo_proc_show["meminfo_proc_show"]
+    show_val_kb["show_val_kb"]
+    style show_val_kb fill:#f96,stroke:#333,stroke-width:4px
+    meminfo_proc_show --> show_val_kb
+```
+
+**Note:** LLM-powered reports (`--llm` flag) automatically include embedded Mermaid diagrams in the report output.
+
+#### 8. **Generate Configuration**
 
 Create configuration template:
 
@@ -499,7 +541,9 @@ kernel-graphrag-sentinel/
 │   │   └── test_mapper.py     # Test-to-function mapping
 │   └── analysis/              # Impact Analysis
 │       ├── queries.py         # Cypher query templates
-│       └── impact_analyzer.py # Impact analysis engine
+│       ├── impact_analyzer.py # Impact analysis engine
+│       ├── llm_reporter.py    # LLM report generation
+│       └── graph_exporter.py  # Call graph visualization (Mermaid, DOT, JSON)
 ├── scripts/
 │   ├── install_neo4j.sh       # Neo4j installation script
 │   └── setup_tree_sitter.sh   # tree-sitter setup
@@ -700,6 +744,8 @@ For large subsystems:
 - ✅ YAML configuration with environment variable override
 - ✅ LLM-powered natural language reports (4 providers: Anthropic, OpenAI, Gemini, Ollama)
 - ✅ LLM provider comparison (10 example reports across all providers)
+- ✅ Call graph visualization (Mermaid, Graphviz DOT, JSON export)
+- ✅ Embedded Mermaid diagrams in LLM reports
 - ✅ Subsystem auto-detection utility
 - ✅ Multi-subsystem analysis (tested with ext4, btrfs, proc)
 - ✅ Comprehensive documentation:
