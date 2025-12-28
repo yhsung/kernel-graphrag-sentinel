@@ -21,6 +21,7 @@ Kernel-GraphRAG Sentinel supports multiple LLM providers for generating AI-power
 - **OpenAI** (GPT models) - Good alternative with reasoning models
 - **Google Gemini** - Fast and free tier available
 - **Ollama** - Local models, unlimited usage, no API costs
+- **LM Studio** - Local models with OpenAI-compatible API, GUI-based
 
 ---
 
@@ -129,6 +130,77 @@ ollama list
 
 ---
 
+### 5. LM Studio (Local with GUI)
+
+**Models:**
+- Any GGUF model from Hugging Face
+- Examples: `llama-3-8b`, `mistral-7b`, `qwen-14b`
+- Browse models at [huggingface.co](https://huggingface.co/models?library=gguf)
+
+**Pros:**
+- **User-friendly GUI** - no command line required
+- **Unlimited usage** - no rate limits or API costs
+- **OpenAI-compatible API** - drop-in replacement
+- Complete privacy - runs locally
+- Easy model management with download interface
+- Real-time inference monitoring
+- Cross-platform (Windows, macOS, Linux)
+
+**Cons:**
+- Requires local GPU/CPU resources
+- Slower than cloud APIs (depends on hardware)
+- GUI application needs to stay running
+- Quality depends on chosen model
+
+**Best for:** Users who prefer GUI over CLI, local development, privacy-sensitive work
+
+**Setup:**
+
+1. **Download and install LM Studio:**
+   - Visit [lmstudio.ai](https://lmstudio.ai)
+   - Download for your platform (Windows/Mac/Linux)
+   - Install the application
+
+2. **Download a model:**
+   - Open LM Studio
+   - Click "Search" tab
+   - Search for models (e.g., "llama-3", "mistral", "qwen")
+   - Click download on your preferred model
+   - Wait for download to complete
+
+3. **Start the local server:**
+   - Click "Local Server" tab in LM Studio
+   - Select your downloaded model
+   - Click "Start Server"
+   - Default URL: `http://localhost:1234/v1`
+
+4. **Configure Kernel-GraphRAG Sentinel:**
+
+```bash
+# In .env file
+LLM_PROVIDER=lmstudio
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_MODEL=local-model  # Use the model name shown in LM Studio
+```
+
+5. **Test the connection:**
+
+```bash
+# Verify LM Studio server is running
+curl http://localhost:1234/v1/models
+
+# Run analysis
+python3 src/main.py analyze show_val_kb --llm
+```
+
+**Tips:**
+- Use quantized models (Q4, Q5) for faster inference on consumer hardware
+- Larger models (13B, 30B) provide better quality but need more RAM
+- Monitor GPU/CPU usage in LM Studio's interface
+- LM Studio supports both CPU and GPU acceleration
+
+---
+
 ## Quick Start
 
 ### Method 1: Using .env File (Recommended)
@@ -137,7 +209,7 @@ ollama list
 
 ```bash
 # Choose your provider
-LLM_PROVIDER=anthropic  # Options: anthropic, openai, gemini, ollama
+LLM_PROVIDER=anthropic  # Options: anthropic, openai, gemini, ollama, lmstudio
 
 # Configure provider-specific settings:
 
@@ -156,6 +228,10 @@ GEMINI_MODEL=gemini-1.5-flash
 # Ollama (local)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen3-vl:30b
+
+# LM Studio (local with GUI)
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_MODEL=local-model
 ```
 
 2. **Run analysis:**
@@ -215,6 +291,7 @@ LLM_PROVIDER=anthropic python3 src/main.py analyze ext4_map_blocks --llm
 | OpenAI (gpt-5-nano) | 115+ lines | ⭐⭐⭐⭐ Good | High | ~32s |
 | Gemini (gemini-1.5-flash) | 80-100 lines | ⭐⭐⭐ Good | Medium | ~10s |
 | Ollama (qwen3-vl:30b) | 150+ lines | ⭐⭐⭐⭐ Good | High | ~45s |
+| LM Studio (varies by model) | Varies | ⭐⭐⭐⭐ Good | Medium-High | ~30-60s |
 
 ### Cost Comparison
 
@@ -224,12 +301,14 @@ LLM_PROVIDER=anthropic python3 src/main.py analyze ext4_map_blocks --llm
 | **OpenAI** | $0.15/1M | $0.60/1M | 500 req/min | Reasoning tasks |
 | **Gemini** | Free | Free | 1,500 req/day | Development |
 | **Ollama** | **FREE** | **FREE** | **Unlimited** | Testing/Privacy |
+| **LM Studio** | **FREE** | **FREE** | **Unlimited** | GUI users/Privacy |
 
 **Average cost per analysis:**
 - Anthropic: ~$0.001 per report
 - OpenAI: ~$0.0008 per report
 - Gemini: $0 (free tier)
 - Ollama: $0 (local)
+- LM Studio: $0 (local)
 
 ---
 
@@ -251,7 +330,7 @@ Configuration is loaded in this priority order (highest to lowest):
 # Kernel-GraphRAG Sentinel LLM Configuration
 
 # ==== LLM Provider Selection ====
-# Choose one: anthropic, openai, gemini, ollama
+# Choose one: anthropic, openai, gemini, ollama, lmstudio
 LLM_PROVIDER=anthropic
 
 # ==== Anthropic Claude Configuration ====
@@ -273,6 +352,12 @@ GEMINI_MODEL=gemini-1.5-flash
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen3-vl:30b
 # Options: qwen3-vl:30b, llama3, mistral, any model from ollama.com/library
+
+# ==== LM Studio Configuration (Local with GUI) ====
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_MODEL=local-model
+# Use the model name shown in LM Studio's Local Server tab
+# Examples: llama-3-8b, mistral-7b, qwen-14b
 
 # ==== LLM Parameters (Optional) ====
 # Note: Some models have restrictions (e.g., gpt-5-nano only supports temperature=1.0)
@@ -313,6 +398,11 @@ LLM_TEMPERATURE=0.7  # Range: 0.0-1.0 (0=deterministic, 1=creative)
 #### Ollama (Local)
 - **No rate limits** - unlimited usage
 - **No costs** - runs on your hardware
+
+#### LM Studio (Local)
+- **No rate limits** - unlimited usage
+- **No costs** - runs on your hardware
+- Performance depends on local hardware specs
 
 ### Rate Limit Handling
 
