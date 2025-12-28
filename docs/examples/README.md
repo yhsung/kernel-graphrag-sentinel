@@ -2,18 +2,21 @@
 
 This directory contains example configurations, LLM-generated reports, and query examples for Kernel-GraphRAG Sentinel.
 
+**Location:** `/docs/examples/` (moved from root `examples/` folder in v0.2.0)
+
 ---
 
 ## 📁 Directory Structure
 
 ```
-examples/
-├── README.md                    # This file - comprehensive documentation index
-├── analyze_ext4.yaml            # Example configuration for ext4 analysis
-├── query_examples.md            # 30+ Neo4j Cypher query examples (v0.1.0)
-├── dataflow_example.py          # Data flow analysis example script (v0.2.0)
-├── show_val_kb-callgraph.md     # Example call graph visualization (Mermaid)
-└── reports/                     # LLM-generated and rule-based reports
+docs/examples/
+├── README.md                        # This file - comprehensive documentation index
+├── analyze_ext4.yaml                # Example configuration for ext4 analysis
+├── query_examples.md                # 30+ Neo4j Cypher query examples (v0.1.0)
+├── dataflow_example.py              # Data flow analysis example script (v0.2.0)
+├── dataflow_query_examples.md       # 22 data flow Cypher query examples (v0.2.0)
+├── show_val_kb-callgraph.md         # Example call graph visualization (Mermaid)
+└── reports/                         # LLM-generated and rule-based reports
     ├── rule-based-report.md              # Non-LLM baseline (38 lines)
     ├── anthropic-claude-haiku-4-5-report.md  # Anthropic (203 lines)
     ├── openai-gpt5-nano-report.md        # OpenAI Nano (120 lines)
@@ -55,7 +58,7 @@ examples/
 **Usage:**
 ```bash
 # Run all examples
-python3 examples/dataflow_example.py
+python3 docs/examples/dataflow_example.py
 
 # Requires:
 # - Sample C files in tests/fixtures/
@@ -80,7 +83,7 @@ python3 examples/dataflow_example.py
 
 **Usage:**
 ```bash
-python3 src/main.py --config examples/analyze_ext4.yaml pipeline fs/ext4
+python3 src/main.py --config docs/examples/analyze_ext4.yaml pipeline fs/ext4
 ```
 
 **Configuration:**
@@ -262,7 +265,7 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 
 ### Query Examples
 
-#### `query_examples.md`
+#### `query_examples.md` (v0.1.0 - Call Graph Analysis)
 **Purpose:** Comprehensive collection of Neo4j Cypher queries for call graph analysis
 
 **Contents:**
@@ -279,6 +282,70 @@ All reports analyze the same function (`show_val_kb` from `fs/proc/meminfo.c`) t
 4. Impact analysis queries
 5. Subsystem statistics
 6. Advanced patterns (leaf functions, entry points, circular dependencies)
+
+---
+
+#### `dataflow_query_examples.md` (v0.2.0 - Data Flow Analysis)
+**Purpose:** Query cookbook for data flow analysis with 22 practical examples
+
+**Contents:**
+- 22 Cypher queries for data flow tracking
+- CLI command examples for `kgraph dataflow`
+- Security analysis patterns (taint analysis, buffer tracking)
+- Cross-function data flow queries
+- Advanced patterns for vulnerability detection
+
+**Categories:**
+1. **Basic Queries** (5 examples)
+   - Finding variables by name, type, scope
+   - Listing all data flows
+   - Parameter and local variable queries
+
+2. **Security Analysis** (4 examples)
+   - User-controlled input tracking
+   - Return value flow analysis
+   - Pointer variable tracking
+   - Static variable identification
+
+3. **Buffer Tracking** (3 examples)
+   - Buffer variable identification
+   - Buffer size correlation
+   - Buffer overflow detection patterns
+
+4. **Taint Analysis** (4 examples)
+   - User input propagation
+   - Taint source identification
+   - Taint sink detection
+   - Full taint chain analysis
+
+5. **Cross-Function Flows** (3 examples)
+   - Parameter passing tracking
+   - Return value flows
+   - Inter-procedural data dependencies
+
+6. **Advanced Patterns** (3 examples)
+   - Flow chain depth analysis
+   - Complex flow path queries
+   - Multi-hop flow aggregation
+
+**Example Query:**
+```cypher
+// Track user-controlled input (Security Analysis)
+MATCH path = (param:Variable {is_parameter: true})-[:FLOWS_TO*1..5]->(v:Variable)
+WHERE param.scope = "ext4_ioctl"
+RETURN param.name, v.name, v.scope, length(path) as depth
+ORDER BY depth
+LIMIT 100
+```
+
+**CLI Usage:**
+```bash
+# Analyze variable data flow
+kgraph dataflow inode --max-depth 5 --direction both
+
+# Track buffer flows in specific function
+kgraph dataflow buffer --function ext4_read_block --direction forward
+```
 
 ---
 
@@ -476,7 +543,7 @@ done
 
 ```bash
 # Use example configuration
-python3 src/main.py --config examples/analyze_ext4.yaml analyze ext4_file_write_iter --llm
+python3 src/main.py --config docs/examples/analyze_ext4.yaml analyze ext4_file_write_iter --llm
 ```
 
 ### Example 6: Complete Pipeline
@@ -795,7 +862,7 @@ All LLM-generated reports include these sections (structure varies by provider):
 export LLM_PROVIDER=anthropic  # or openai, gemini, ollama
 
 # 2. Analyze a function
-python3 src/main.py analyze <function_name> --llm --max-depth 3 --output examples/my_example.md
+python3 src/main.py analyze <function_name> --llm --max-depth 3 --output docs/examples/my_example.md
 
 # 3. Add to this index if useful for others
 ```
@@ -885,6 +952,7 @@ To contribute new examples:
 **Current examples:**
 - Configuration files: 1
 - Visualization examples: 1 (show_val_kb-callgraph.md with Mermaid diagram)
+- Python script examples: 1 (dataflow_example.py - v0.2.0)
 - Example reports: 10 total
   - 1 Rule-based (non-LLM) baseline
   - 9 LLM reports across 4 providers:
@@ -892,13 +960,18 @@ To contribute new examples:
     - OpenAI: GPT-5 Nano, GPT-5 Mini, GPT-5.2 (3 models)
     - Gemini: 3.0 Flash, 3.0 Pro, 2.5 Pro (3 models)
     - Ollama: Qwen3-VL 30B (1 model)
-- Query examples: 30+ Cypher queries
-- Total documentation: 4,200+ lines
+- Query examples:
+  - v0.1.0 Call Graph: 30+ Cypher queries
+  - v0.2.0 Data Flow: 22 Cypher queries
+- Total documentation: 5,100+ lines
 
 **Documentation coverage:**
 - Main docs: 3,343 lines across 4 files
-- Examples: 800+ lines
-- README: Updated with Phase 7 visualization features
+- Examples: 1,600+ lines
+  - dataflow_query_examples.md: 461 lines
+  - dataflow_example.py: 195 lines
+  - query_examples.md: 800+ lines
+  - README.md: Updated with v0.2.0 data flow features
 
 ---
 
@@ -915,8 +988,13 @@ Before running your first analysis:
 - [ ] Try standard analysis: `python3 src/main.py analyze show_val_kb`
 - [ ] Try LLM analysis: `python3 src/main.py analyze show_val_kb --llm`
 
+**v0.2.0 Data Flow Analysis:**
+- [ ] Ingest data flows: `kgraph ingest-dataflow fs/ext4`
+- [ ] Analyze variable flow: `kgraph dataflow inode --max-depth 5`
+- [ ] Try query examples from `docs/examples/dataflow_query_examples.md`
+
 ---
 
-**Last Updated:** 2025-12-27
-**Version:** v0.1.0
+**Last Updated:** 2025-12-28
+**Version:** v0.2.0-dev
 **Project:** Kernel-GraphRAG Sentinel - AI-Powered Linux Kernel Code Analysis
