@@ -175,10 +175,16 @@ class LLMReporter:
         if self.graph_exporter:
             try:
                 mermaid_diagram = self.graph_exporter.generate_mermaid_for_impact(impact_data)
-                lines.append("Call Graph Visualization:")
+                lines.append("=" * 60)
+                lines.append("CALL GRAPH VISUALIZATION (Mermaid Format)")
+                lines.append("=" * 60)
+                lines.append("")
+                lines.append("IMPORTANT: Include this exact Mermaid diagram in Section 3.3 of your report.")
+                lines.append("Copy the diagram exactly as shown below:")
+                lines.append("")
                 lines.append(mermaid_diagram)
                 lines.append("")
-                lines.append("(Note: Include this Mermaid diagram in your report)")
+                lines.append("=" * 60)
                 lines.append("")
             except Exception as e:
                 logger.warning(f"Failed to generate Mermaid diagram: {e}")
@@ -261,7 +267,20 @@ Concise overview covering:
 - Abstraction layers
 - Visibility (internal/external/public)
 
-Include the call graph visualization if provided in the context.
+### 3.3 Call Graph Visualization
+**IMPORTANT:** If a Mermaid diagram is provided in the context (look for "CALL GRAPH VISUALIZATION" section), you MUST include it here exactly as provided to visualize the function's relationships:
+
+```mermaid
+[Copy the exact Mermaid diagram from the context - look for the diagram between the separator lines]
+```
+
+The diagram shows:
+- The target function (highlighted)
+- Direct callers (functions that call this function)
+- Direct callees (functions this function calls)
+- Relationship hierarchy and dependencies
+
+This visualization is critical for understanding the impact scope at a glance.
 
 ## 4. TESTING REQUIREMENTS
 
