@@ -20,6 +20,7 @@ from src.module_b.graph_store import Neo4jGraphStore
 from src.module_b.ingestion import ingest_from_extractor
 from src.module_c.test_mapper import TestMapper
 from src.analysis.impact_analyzer import ImpactAnalyzer
+from src.module_d.flow_ingestion import DataFlowIngestion
 
 # Configure logging
 logging.basicConfig(
@@ -446,13 +447,178 @@ def export_graph(ctx, function_name, format, output, max_depth, direction):
         raise click.Abort()
 
 
+@cli.command('ingest-dataflow')
+@click.argument('subsystem')
+@click.option('--skip-preprocessing', is_flag=True,
+              help='Skip macro preprocessing')
+@click.pass_context
+def ingest_dataflow(ctx, subsystem, skip_preprocessing):
+    """
+    Extract and ingest data flow information into Neo4j.
+
+    SUBSYSTEM: Relative path to subsystem (e.g., fs/ext4)
+
+    This command extracts variable definitions, uses, and data flow edges
+    from C code and stores them in Neo4j for advanced analysis.
+
+    Examples:
+
+        kgraph ingest-dataflow fs/ext4
+
+        kgraph ingest-dataflow fs/ext4 --skip-preprocessing
+    """
+    config = ctx.obj['config']
+    config.kernel.subsystem = subsystem
+
+    click.echo(f"Ingesting data flow for {subsystem}...")
+    click.echo(f"Kernel root: {config.kernel.root}")
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        # Create data flow ingestion pipeline
+        ingestion = DataFlowIngestion(store)
+
+        # Setup schema
+        click.echo("Setting up data flow schema...")
+        ingestion.setup_schema()
+
+        # Ingest subsystem directory
+        subsystem_path = Path(config.kernel.root) / subsystem
+        stats = ingestion.ingest_directory(str(subsystem_path), subsystem)
+
+        click.echo("\n" + "=" * 60)
+        click.echo("DATA FLOW INGESTION COMPLETE")
+        click.echo("=" * 60)
+        click.echo(json.dumps(stats, indent=2))
+
+        # Get statistics
+        click.echo("\nData Flow Statistics:")
+        df_stats = ingestion.get_variable_statistics()
+        click.echo(json.dumps(df_stats, indent=2))
+
+
+@cli.command('dataflow')
+@click.argument('variable_name')
+@click.option('--function', '-f', help='Limit to specific function')
+@click.option('--max-depth', '-d', default=3, type=int,
+              help='Maximum flow chain depth')
+@click.option('--direction', type=click.Choice(['forward', 'backward', 'both']),
+              default='both', help='Flow direction to analyze')
+@click.pass_context
+def dataflow(ctx, variable_name, function, max_depth, direction):
+    """
+    Analyze data flow for a variable.
+
+    VARIABLE_NAME: Name of the variable to trace
+
+    This command shows how data flows through a variable, tracking
+    assignments, function parameters, and return values.
+
+    Examples:
+
+        kgraph dataflow inode
+
+        kgraph dataflow buffer --function ext4_read_block
+
+        kgraph dataflow result --max-depth 5 --direction forward
+    """
+    config = ctx.obj['config']
+
+    click.echo(f"Analyzing data flow for variable: {variable_name}")
+    if function:
+        click.echo(f"Function scope: {function}")
+    click.echo(f"Max depth: {max_depth}")
+    click.echo(f"Direction: {direction}")
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        # Build query based on direction
+        if direction == 'forward':
+            # Variables that this variable flows TO
+            query = """
+            MATCH path = (v1:Variable {name: $var_name})-[:FLOWS_TO*1..$max_depth]->(v2:Variable)
+            """ + (f"WHERE v1.scope = '{function}'" if function else "") + """
+            RETURN v1.name as from_var, v1.scope as from_scope,
+                   v2.name as to_var, v2.scope as to_scope,
+                   length(path) as depth
+            ORDER BY depth, to_var
+            LIMIT 50
+            """
+        elif direction == 'backward':
+            # Variables that flow TO this variable
+            query = """
+            MATCH path = (v1:Variable)-[:FLOWS_TO*1..$max_depth]->(v2:Variable {name: $var_name})
+            """ + (f"WHERE v2.scope = '{function}'" if function else "") + """
+            RETURN v1.name as from_var, v1.scope as from_scope,
+                   v2.name as to_var, v2.scope as to_scope,
+                   length(path) as depth
+            ORDER BY depth, from_var
+            LIMIT 50
+            """
+        else:  # both
+            query = """
+            MATCH path = (v1:Variable)-[:FLOWS_TO*1..$max_depth]-(v2:Variable)
+            WHERE v1.name = $var_name OR v2.name = $var_name
+            """ + (f"AND (v1.scope = '{function}' OR v2.scope = '{function}')" if function else "") + """
+            RETURN v1.name as from_var, v1.scope as from_scope,
+                   v2.name as to_var, v2.scope as to_scope,
+                   length(path) as depth
+            ORDER BY depth, from_var, to_var
+            LIMIT 50
+            """
+
+        results = store.execute_query(query, {
+            'var_name': variable_name,
+            'max_depth': max_depth
+        })
+
+        if not results:
+            click.echo(f"\n❌ No data flows found for variable '{variable_name}'")
+            click.echo("\nTip: Make sure you've run 'kgraph ingest-dataflow <subsystem>' first")
+            sys.exit(1)
+
+        click.echo("\n" + "=" * 60)
+        click.echo(f"DATA FLOW ANALYSIS: {variable_name}")
+        click.echo("=" * 60)
+
+        for record in results:
+            depth_indicator = "  " * record['depth']
+            click.echo(f"{depth_indicator}{record['from_var']} ({record['from_scope']}) "
+                      f"→ {record['to_var']} ({record['to_scope']}) "
+                      f"[depth: {record['depth']}]")
+
+        click.echo(f"\nTotal flows: {len(results)}")
+
+        # Show additional variable info
+        var_query = """
+        MATCH (v:Variable {name: $var_name})
+        RETURN v.name as name, v.type as type, v.scope as scope,
+               v.is_parameter as is_param, v.is_pointer as is_ptr,
+               v.file_path as file
+        LIMIT 10
+        """
+        var_results = store.execute_query(var_query, {'var_name': variable_name})
+
+        if var_results:
+            click.echo("\n" + "=" * 60)
+            click.echo(f"VARIABLE DEFINITIONS: {variable_name}")
+            click.echo("=" * 60)
+
+            for var in var_results:
+                file_short = Path(var['file']).name if var['file'] else 'unknown'
+                param_marker = " [param]" if var['is_param'] else ""
+                ptr_marker = " [ptr]" if var['is_ptr'] else ""
+                click.echo(f"  {var['type']} {var['name']} in {var['scope']}{param_marker}{ptr_marker}")
+                click.echo(f"    File: {file_short}")
+
+
 @cli.command()
 @click.pass_context
 def version(ctx):
     """Show version information."""
-    click.echo("Kernel-GraphRAG Sentinel v0.1.0")
+    click.echo("Kernel-GraphRAG Sentinel v0.2.0-dev")
     click.echo("AI-powered Linux kernel code analysis")
-    click.echo("\nPhases completed: 7/7 (100%)")
+    click.echo("\nv0.1.0 - Core functionality complete")
     click.echo("  ✅ Phase 1: Environment Setup")
     click.echo("  ✅ Phase 2: C Code Parser")
     click.echo("  ✅ Phase 3: Neo4j Graph Store")
@@ -460,6 +626,11 @@ def version(ctx):
     click.echo("  ✅ Phase 5: Impact Analysis")
     click.echo("  ✅ Phase 6: CLI Interface")
     click.echo("  ✅ Phase 7: Visualization & Documentation")
+    click.echo("\nv0.2.0-dev - Data Flow Analysis (in progress)")
+    click.echo("  ✅ Module D: Variable tracking & flow analysis")
+    click.echo("  ✅ Neo4j data flow ingestion")
+    click.echo("  ✅ CLI commands: ingest-dataflow, dataflow")
+    click.echo("  🔄 Integration tests & documentation")
 
 
 def main():
