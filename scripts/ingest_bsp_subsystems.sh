@@ -2,13 +2,6 @@
 # Ingest all critical BSP subsystems for kernel-graphrag-sentinel
 # Based on: docs/bsp_porting_subsystems_ingestion_plan.md
 # Total estimated time: ~40 minutes
-
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-cd "$PROJECT_ROOT"
-
 echo "========================================="
 echo "BSP Subsystem Ingestion Script"
 echo "========================================="
@@ -42,6 +35,8 @@ echo "[1/3] Ingesting drivers/of (Device Tree)..."
 echo "  Purpose: Device Tree parsing & platform device creation"
 echo "  Files: 22, Est. time: ~30s"
 python3 src/main.py pipeline drivers/of
+python3 src/main.py ingest-dataflow drivers/of
+python3 src/main.py map-tests drivers/of
 echo "✅ drivers/of ingested"
 echo ""
 
@@ -49,6 +44,8 @@ echo "[2/3] Ingesting drivers/base (Driver Core)..."
 echo "  Purpose: Core driver model (platform drivers, buses)"
 echo "  Files: 85, Est. time: ~2 min"
 python3 src/main.py pipeline drivers/base
+python3 src/main.py ingest-dataflow drivers/base
+python3 src/main.py map-tests drivers/base
 echo "✅ drivers/base ingested"
 echo ""
 
@@ -56,6 +53,8 @@ echo "[3/3] Ingesting drivers/irqchip (Interrupt Controllers)..."
 echo "  Purpose: Interrupt controller drivers (GIC, NVIC, etc.)"
 echo "  Files: 143, Est. time: ~3 min"
 python3 src/main.py pipeline drivers/irqchip
+python3 src/main.py ingest-dataflow drivers/irqchip
+python3 src/main.py map-tests drivers/irqchip
 echo "✅ drivers/irqchip ingested"
 echo ""
 
@@ -74,6 +73,8 @@ echo "[1/4] Ingesting drivers/clk (Clock Framework)..."
 echo "  Purpose: Common Clock Framework (CCF)"
 echo "  Files: 1061, Est. time: ~8 min"
 python3 src/main.py pipeline drivers/clk
+python3 src/main.py ingest-dataflow drivers/clk
+python3 src/main.py map-tests drivers/clk
 echo "✅ drivers/clk ingested"
 echo ""
 
@@ -81,6 +82,8 @@ echo "[2/4] Ingesting drivers/pinctrl (Pin Control)..."
 echo "  Purpose: Pin multiplexing and electrical config"
 echo "  Files: 450, Est. time: ~6 min"
 python3 src/main.py pipeline drivers/pinctrl
+python3 src/main.py ingest-dataflow drivers/pinctrl
+python3 src/main.py map-tests drivers/pinctrl
 echo "✅ drivers/pinctrl ingested"
 echo ""
 
@@ -88,6 +91,8 @@ echo "[3/4] Ingesting drivers/gpio (GPIO)..."
 echo "  Purpose: GPIO operations and chip drivers"
 echo "  Files: 205, Est. time: ~4 min"
 python3 src/main.py pipeline drivers/gpio
+python3 src/main.py ingest-dataflow drivers/gpio
+python3 src/main.py map-tests drivers/gpio
 echo "✅ drivers/gpio ingested"
 echo ""
 
@@ -95,6 +100,8 @@ echo "[4/4] Ingesting arch/arm64/kernel (ARM64 Architecture)..."
 echo "  Purpose: ARM64 architecture-specific code"
 echo "  Files: 79, Est. time: ~2 min"
 python3 src/main.py pipeline arch/arm64/kernel
+python3 src/main.py ingest-dataflow arch/arm64/kernel
+python3 src/main.py map-tests arch/arm64/kernel
 echo "✅ arch/arm64/kernel ingested"
 echo ""
 
@@ -113,6 +120,8 @@ echo "[1/6] Ingesting drivers/regulator (Voltage Regulators)..."
 echo "  Purpose: Voltage regulator framework"
 echo "  Files: 212, Est. time: ~4 min"
 python3 src/main.py pipeline drivers/regulator
+python3 src/main.py ingest-dataflow drivers/regulator
+python3 src/main.py map-tests drivers/regulator
 echo "✅ drivers/regulator ingested"
 echo ""
 
@@ -120,6 +129,8 @@ echo "[2/6] Ingesting drivers/dma (DMA Engine)..."
 echo "  Purpose: DMA engine framework"
 echo "  Files: 165, Est. time: ~3 min"
 python3 src/main.py pipeline drivers/dma
+python3 src/main.py ingest-dataflow drivers/dma
+python3 src/main.py map-tests drivers/dma
 echo "✅ drivers/dma ingested"
 echo ""
 
@@ -127,6 +138,8 @@ echo "[3/6] Ingesting drivers/i2c (I2C Bus)..."
 echo "  Purpose: I2C bus infrastructure"
 echo "  Files: 174, Est. time: ~3 min"
 python3 src/main.py pipeline drivers/i2c
+python3 src/main.py ingest-dataflow drivers/i2c
+python3 src/main.py map-tests drivers/i2c
 echo "✅ drivers/i2c ingested"
 echo ""
 
@@ -134,6 +147,8 @@ echo "[4/6] Ingesting drivers/spi (SPI Bus)..."
 echo "  Purpose: SPI bus infrastructure"
 echo "  Files: 170, Est. time: ~3 min"
 python3 src/main.py pipeline drivers/spi
+python3 src/main.py ingest-dataflow drivers/spi
+python3 src/main.py map-tests drivers/spi
 echo "✅ drivers/spi ingested"
 echo ""
 
@@ -141,6 +156,8 @@ echo "[5/6] Ingesting drivers/mmc/core (MMC/SD Core)..."
 echo "  Purpose: MMC/SD/eMMC core"
 echo "  Files: 26, Est. time: ~30s"
 python3 src/main.py pipeline drivers/mmc/core
+python3 src/main.py ingest-dataflow drivers/mmc/core
+python3 src/main.py map-tests drivers/mmc/core
 echo "✅ drivers/mmc/core ingested"
 echo ""
 
@@ -148,6 +165,8 @@ echo "[6/6] Ingesting drivers/usb/core (USB Core)..."
 echo "  Purpose: USB core infrastructure"
 echo "  Files: 22, Est. time: ~30s"
 python3 src/main.py pipeline drivers/usb/core
+python3 src/main.py ingest-dataflow drivers/usb/core
+python3 src/main.py map-tests drivers/usb/core
 echo "✅ drivers/usb/core ingested"
 echo ""
 
