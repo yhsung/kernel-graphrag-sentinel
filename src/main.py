@@ -925,13 +925,321 @@ def cve_list(ctx, severity, limit):
             click.echo("No CVEs found")
 
 
+# ==================== Log Coverage Commands ====================
+
+@cli.group()
+@click.pass_context
+def logs(ctx):
+    """Log coverage analysis commands."""
+    pass
+
+
+@logs.command('extract')
+@click.argument('subsystem')
+@click.option('--output', '-o', type=click.Path(), help='Output JSON file')
+@click.pass_context
+def logs_extract(ctx, subsystem, output):
+    """
+    Extract log statements from kernel subsystem.
+
+    SUBSYSTEM: Relative path to subsystem (e.g., fs/ext4)
+
+    Examples:
+
+        kgraph logs extract fs/ext4
+
+        kgraph logs extract fs/ext4 -o logs.json
+    """
+    config = ctx.obj['config']
+
+    from src.module_f.log_extractor import LogExtractor
+    from pathlib import Path
+
+    subsystem_path = Path(config.kernel.root) / subsystem
+
+    if not subsystem_path.exists():
+        click.echo(f"❌ Subsystem path not found: {subsystem_path}", err=True)
+        raise click.Abort()
+
+    click.echo(f"Extracting logs from {subsystem}...")
+
+    extractor = LogExtractor()
+    all_logs = []
+
+    # Process all .c files in subsystem
+    for c_file in subsystem_path.rglob('*.c'):
+        try:
+            logs = extractor.extract_from_file(str(c_file))
+            all_logs.extend(logs)
+            click.echo(f"  {c_file.name}: {len(logs)} logs")
+        except Exception as e:
+            logger.warning(f"Failed to extract logs from {c_file}: {e}")
+
+    click.echo(f"\n✅ Extracted {len(all_logs)} log statements")
+
+    # Output results
+    if output:
+        import json
+        output_data = [log.to_dict() for log in all_logs]
+        with open(output, 'w') as f:
+            json.dump(output_data, f, indent=2)
+        click.echo(f"Logs saved to {output}")
+    else:
+        # Print summary
+        from collections import Counter
+        log_funcs = Counter([log.log_function for log in all_logs])
+        click.echo("\nLog functions used:")
+        for func, count in log_funcs.most_common():
+            click.echo(f"  {func}: {count}")
+
+
+@logs.command('coverage')
+@click.argument('function')
+@click.option('--file', '-f', type=click.Path(exists=True), help='C source file path')
+@click.option('--suggest', is_flag=True, help='Show log placement suggestions')
+@click.pass_context
+def logs_coverage(ctx, function, file, suggest):
+    """
+    Analyze log coverage for a function.
+
+    FUNCTION: Function name to analyze
+
+    Examples:
+
+        kgraph logs coverage ext4_writepages
+
+        kgraph logs coverage ext4_writepages --suggest
+
+        kgraph logs coverage ext4_writepages -f fs/ext4/inode.c --suggest
+    """
+    config = ctx.obj['config']
+
+    from src.module_f.coverage_analyzer import CoverageAnalyzer
+    from pathlib import Path
+
+    if not file:
+        click.echo("❌ Error: --file is required", err=True)
+        raise click.Abort()
+
+    click.echo(f"Analyzing log coverage for {function}...")
+
+    analyzer = CoverageAnalyzer()
+    source_code = Path(file).read_text(encoding='utf-8', errors='ignore')
+
+    report = analyzer.analyze_function(source_code, function, file)
+
+    # Print coverage report
+    analyzer.print_coverage_report(report, verbose=True)
+
+    # Show suggestions if requested
+    if suggest and report.unlogged_paths:
+        suggestions = analyzer.suggest_logs(report, source_code)
+        analyzer.print_suggestions(suggestions)
+
+
+@logs.command('gaps')
+@click.argument('function')
+@click.option('--file', '-f', type=click.Path(exists=True), required=True,
+              help='C source file path')
+@click.option('--suggest', is_flag=True, help='Show log placement suggestions')
+@click.pass_context
+def logs_gaps(ctx, function, file, suggest):
+    """
+    Show unlogged error paths (gaps) for a function.
+
+    FUNCTION: Function name to analyze
+
+    Examples:
+
+        kgraph logs gaps ext4_writepages -f fs/ext4/inode.c
+
+        kgraph logs gaps ext4_writepages -f fs/ext4/inode.c --suggest
+    """
+    config = ctx.obj['config']
+
+    from src.module_f.coverage_analyzer import CoverageAnalyzer
+    from pathlib import Path
+
+    click.echo(f"Finding log gaps for {function}...")
+
+    analyzer = CoverageAnalyzer()
+    source_code = Path(file).read_text(encoding='utf-8', errors='ignore')
+
+    report = analyzer.analyze_function(source_code, function, file)
+
+    if not report.unlogged_paths:
+        click.echo(f"\n✓ No gaps found - {function} has 100% coverage!")
+        return
+
+    click.echo(f"\n{function}: {len(report.unlogged_paths)} unlogged error paths\n")
+
+    for gap in report.unlogged_paths:
+        error_info = f"{gap.path_type}"
+        if gap.path_type == 'return' and gap.error_code:
+            error_info += f" {gap.error_code}"
+        elif gap.path_type == 'goto' and gap.goto_label:
+            error_info += f" {gap.goto_label}"
+
+        click.echo(f"  ✗ Line {gap.line_number}: {error_info}")
+
+    # Show suggestions if requested
+    if suggest:
+        suggestions = analyzer.suggest_logs(report, source_code)
+        analyzer.print_suggestions(suggestions)
+
+
+@logs.command('dmesg')
+@click.argument('message')
+@click.option('--subsystem', '-s', help='Limit to subsystem')
+@click.pass_context
+def logs_dmesg(ctx, message, subsystem):
+    """
+    Quick dmesg → code lookup.
+
+    MESSAGE: Error message from dmesg (or pattern)
+
+    Examples:
+
+        kgraph logs dmesg "ext4 writepage failed"
+
+        kgraph logs dmesg "allocation failed" -s fs/ext4
+    """
+    config = ctx.obj['config']
+
+    from src.module_f.log_search import LogSearch
+    from src.module_f.log_extractor import LogExtractor
+    from pathlib import Path
+
+    click.echo(f"Searching for: {message}")
+
+    # Extract logs from subsystem
+    extractor = LogExtractor()
+    all_logs = []
+
+    if subsystem:
+        subsystem_path = Path(config.kernel.root) / subsystem
+        for c_file in subsystem_path.rglob('*.c'):
+            try:
+                logs = extractor.extract_from_file(str(c_file))
+                all_logs.extend(logs)
+            except Exception as e:
+                logger.warning(f"Failed to extract logs from {c_file}: {e}")
+    else:
+        click.echo("❌ Error: --subsystem is required for dmesg search", err=True)
+        click.echo("Tip: Use --subsystem to limit search scope and improve performance")
+        raise click.Abort()
+
+    # Build search index
+    search = LogSearch()
+    search.index_logs(all_logs)
+
+    # Search for matches
+    matches = search.search(message)
+
+    # Print results
+    search.print_search_results(matches, message)
+
+
+@logs.command('report')
+@click.argument('subsystem')
+@click.option('--output', '-o', type=click.Path(), help='Output markdown file')
+@click.option('--json', is_flag=True, help='Output JSON format')
+@click.pass_context
+def logs_report(ctx, subsystem, output, json):
+    """
+    Generate log coverage report for a subsystem.
+
+    SUBSYSTEM: Relative path to subsystem (e.g., fs/ext4)
+
+    Examples:
+
+        kgraph logs report fs/ext4
+
+        kgraph logs report fs/ext4 -o coverage_report.md
+
+        kgraph logs report fs/ext4 --json -o report.json
+    """
+    config = ctx.obj['config']
+
+    from src.module_f.coverage_analyzer import CoverageAnalyzer
+    from src.module_f.redundant_detector import RedundantDetector
+    from src.module_f.log_reporter import LogReporter
+    from pathlib import Path
+
+    subsystem_path = Path(config.kernel.root) / subsystem
+
+    if not subsystem_path.exists():
+        click.echo(f"❌ Subsystem path not found: {subsystem_path}", err=True)
+        raise click.Abort()
+
+    click.echo(f"Generating log coverage report for {subsystem}...")
+
+    analyzer = CoverageAnalyzer()
+    redundant_detector = RedundantDetector()
+    reporter = LogReporter()
+
+    all_reports = {}
+    all_logs = []
+    all_suggestions = {}
+
+    # Analyze all .c files
+    for c_file in subsystem_path.rglob('*.c'):
+        try:
+            source_code = c_file.read_text(encoding='utf-8', errors='ignore')
+
+            # Extract logs
+            from src.module_f.log_extractor import LogExtractor
+            extractor = LogExtractor()
+            logs = extractor.extract_from_file(str(c_file))
+            all_logs.extend(logs)
+
+            # Analyze coverage per function
+            file_reports = analyzer.analyze_file(str(c_file))
+            all_reports.update(file_reports)
+
+        except Exception as e:
+            logger.warning(f"Failed to analyze {c_file}: {e}")
+
+    # Generate suggestions for functions with gaps
+    for func_name, report in all_reports.items():
+        if report.unlogged_paths:
+            source_code = Path(report.file_path).read_text(encoding='utf-8', errors='ignore')
+            suggestions = analyzer.suggest_logs(report, source_code)
+            if suggestions:
+                all_suggestions[func_name] = suggestions
+
+    # Detect redundant logs
+    redundant_logs = redundant_detector.find_redundant_logs(all_logs)
+
+    # Generate report
+    if json:
+        report_json = reporter.generate_json_report(all_reports, all_suggestions, redundant_logs)
+        import json
+        report_text = json.dumps(report_json, indent=2)
+    else:
+        report_text = reporter.generate_markdown_report(
+            all_reports,
+            all_suggestions,
+            redundant_logs,
+            title=f"Log Coverage Report: {subsystem}"
+        )
+
+    # Output
+    if output:
+        with open(output, 'w') as f:
+            f.write(report_text)
+        click.echo(f"✅ Report saved to {output}")
+    else:
+        click.echo("\n" + report_text)
+
+
 # ==================== Version Command ====================
 
 @cli.command()
 @click.pass_context
 def version(ctx):
     """Show version information."""
-    click.echo("Kernel-GraphRAG Sentinel v0.4.0")
+    click.echo("Kernel-GraphRAG Sentinel v0.5.0")
     click.echo("AI-powered Linux kernel code analysis")
     click.echo("\nv0.1.0 - Core functionality complete")
     click.echo("  ✅ Phase 1: Environment Setup")
@@ -952,6 +1260,14 @@ def version(ctx):
     click.echo("  ✅ Test coverage analysis for CVEs")
     click.echo("  ✅ CVE reporting & backport checklists")
     click.echo("  ✅ CLI commands: cve import, impact, check, report, ...")
+    click.echo("\nv0.5.0 - Log Coverage Analyzer")
+    click.echo("  ✅ Module F: Log extraction & analysis")
+    click.echo("  ✅ Error path detection & coverage calculation")
+    click.echo("  ✅ Gap detection with suggestions")
+    click.echo("  ✅ Redundant log detection")
+    click.echo("  ✅ dmesg → code lookup")
+    click.echo("  ✅ Coverage reporting (markdown/JSON)")
+    click.echo("  ✅ CLI commands: logs extract, coverage, gaps, dmesg, report")
 
 
 def main():
