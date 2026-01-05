@@ -612,11 +612,326 @@ def dataflow(ctx, variable_name, function, max_depth, direction):
                 click.echo(f"    File: {file_short}")
 
 
+# ==================== CVE Commands ====================
+
+@cli.group()
+@click.pass_context
+def cve(ctx):
+    """CVE impact analysis commands."""
+    pass
+
+
+@cve.command('import')
+@click.argument('source')
+@click.option('--description', '-d', type=str,
+              help='CVE description text (if SOURCE is a CVE ID)')
+@click.option('--severity', '-s', type=click.Choice(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
+              default='MEDIUM', help='CVE severity level')
+@click.option('--cvss', type=float, default=0.0, help='CVSS score (0-10)')
+@click.pass_context
+def cve_import(ctx, source, description, severity, cvss):
+    """
+    Import CVE from NVD JSON file or CVE ID with description.
+
+    SOURCE: NVD JSON file path or CVE ID (e.g., CVE-2024-1234)
+
+    Examples:
+
+        # Import from NVD JSON file
+        kgraph cve import nvd-2024.json
+
+        # Import from CVE ID with description
+        kgraph cve import CVE-2024-1234 -d "Buffer overflow in ext4_writepages" -s CRITICAL --cvss 9.8
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.cve_importer import CVEImporter
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        importer = CVEImporter(store, config.llm)
+
+        # Check if source is a file or CVE ID
+        if Path(source).exists():
+            # Import from JSON file
+            click.echo(f"Importing CVEs from {source}...")
+            cves = importer.import_from_nvd_json(source)
+            click.echo(f"✅ Imported {len(cves)} CVEs")
+        else:
+            # Import from CVE ID
+            if not description:
+                click.echo("❌ Error: --description is required when importing by CVE ID", err=True)
+                raise click.Abort()
+
+            click.echo(f"Importing CVE {source}...")
+            cve = importer.import_cve_from_text(
+                source,
+                description,
+                metadata={'severity': severity, 'cvss_score': cvss}
+            )
+
+            if cve:
+                click.echo(f"✅ Imported CVE {source}")
+                click.echo(f"   Function: {cve.affected_function}")
+                click.echo(f"   Type: {cve.vulnerability_type}")
+            else:
+                click.echo(f"❌ Failed to import CVE {source}")
+                raise click.Abort()
+
+
+@cve.command('impact')
+@click.argument('cve_id')
+@click.option('--max-depth', type=int, default=5, help='Max depth for call chain traversal')
+@click.pass_context
+def cve_impact(ctx, cve_id, max_depth):
+    """
+    Analyze the impact of a CVE.
+
+    CVE_ID: CVE identifier (e.g., CVE-2024-1234)
+
+    Examples:
+
+        kgraph cve impact CVE-2024-1234
+
+        kgraph cve impact CVE-2024-1234 --max-depth 10
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.impact_analyzer import CVEImpactAnalyzer
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        analyzer = CVEImpactAnalyzer(store)
+
+        click.echo(f"Analyzing impact for {cve_id}...")
+        impact = analyzer.analyze_cve_impact(cve_id, max_depth=max_depth)
+
+        if impact:
+            report = analyzer.format_impact_report(impact)
+            click.echo(report)
+        else:
+            click.echo(f"❌ CVE {cve_id} not found", err=True)
+            raise click.Abort()
+
+
+@cve.command('check')
+@click.argument('cve_id')
+@click.option('--kernel-version', '-k', required=True, type=str,
+              help='Kernel version to check (e.g., 5.15, 6.1)')
+@click.pass_context
+def cve_check(ctx, cve_id, kernel_version):
+    """
+    Check if CVE affects a specific kernel version.
+
+    CVE_ID: CVE identifier (e.g., CVE-2024-1234)
+
+    Examples:
+
+        kgraph cve check CVE-2024-1234 -k 5.15
+
+        kgraph cve check CVE-2024-1234 --kernel-version 6.1
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.version_checker import VersionChecker
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        checker = VersionChecker(store, config.kernel.root)
+
+        click.echo(f"Checking {cve_id} for kernel {kernel_version}...")
+        result = checker.check_cve_version(cve_id, kernel_version)
+
+        if result:
+            report = checker.format_version_report(result)
+            click.echo(report)
+        else:
+            click.echo(f"❌ Failed to check CVE {cve_id}", err=True)
+            raise click.Abort()
+
+
+@cve.command('test-gaps')
+@click.argument('cve_id')
+@click.pass_context
+def cve_test_gaps(ctx, cve_id):
+    """
+    Analyze test coverage gaps for a CVE.
+
+    CVE_ID: CVE identifier (e.g., CVE-2024-1234)
+
+    Examples:
+
+        kgraph cve test-gaps CVE-2024-1234
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.test_coverage import CVETestCoverage
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        analyzer = CVETestCoverage(store)
+
+        click.echo(f"Analyzing test coverage for {cve_id}...")
+        analysis = analyzer.analyze_cve_test_coverage(cve_id)
+
+        if analysis:
+            report = analyzer.format_coverage_report(analysis)
+            click.echo(report)
+        else:
+            click.echo(f"❌ Failed to analyze test coverage for {cve_id}", err=True)
+            raise click.Abort()
+
+
+@cve.command('report')
+@click.argument('cve_id')
+@click.option('--kernel-version', '-k', type=str, help='Kernel version to check')
+@click.option('--output', '-o', type=click.Path(), help='Output file (markdown)')
+@click.pass_context
+def cve_report(ctx, cve_id, kernel_version, output):
+    """
+    Generate a comprehensive CVE impact report.
+
+    CVE_ID: CVE identifier (e.g., CVE-2024-1234)
+
+    Examples:
+
+        kgraph cve report CVE-2024-1234
+
+        kgraph cve report CVE-2024-1234 -k 5.15
+
+        kgraph cve report CVE-2024-1234 -k 5.15 -o report.md
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.cve_reporter import CVEReporter
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        reporter = CVEReporter(store, config.kernel.root)
+
+        click.echo(f"Generating report for {cve_id}...")
+        report = reporter.generate_cve_report(cve_id, kernel_version)
+
+        if report:
+            if output:
+                with open(output, 'w') as f:
+                    f.write(report)
+                click.echo(f"✅ Report saved to {output}")
+            else:
+                click.echo(report)
+        else:
+            click.echo(f"❌ Failed to generate report for {cve_id}", err=True)
+            raise click.Abort()
+
+
+@cve.command('backport-checklist')
+@click.option('--kernel-version', '-k', required=True, type=str,
+              help='Target kernel version')
+@click.option('--severity', '-s', type=click.Choice(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
+              multiple=True, help='Filter by severity (can be specified multiple times)')
+@click.option('--subsystem', type=str, help='Filter by subsystem (e.g., fs/ext4)')
+@click.option('--output', '-o', type=click.Path(), help='Output file (markdown)')
+@click.pass_context
+def cve_backport_checklist(ctx, kernel_version, severity, subsystem, output):
+    """
+    Generate a backport checklist for CVEs.
+
+    Examples:
+
+        kgraph cve backport-checklist -k 5.15
+
+        kgraph cve backport-checklist -k 5.15 -s CRITICAL -s HIGH
+
+        kgraph cve backport-checklist -k 5.15 --subsystem fs/ext4 -o checklist.md
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.impact_analyzer import CVEImpactAnalyzer
+    from src.module_e.cve_reporter import CVEReporter
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        # Get all CVEs
+        impact_analyzer = CVEImpactAnalyzer(store)
+        cves = impact_analyzer.get_all_cves()
+
+        # Filter by severity
+        if severity:
+            cves = [c for c in cves if c.get('severity') in severity]
+
+        # Filter by subsystem
+        if subsystem:
+            cves = [c for c in cves if subsystem in c.get('file_path', '')]
+
+        if not cves:
+            click.echo("No CVEs found matching criteria")
+            return
+
+        cve_ids = [c['id'] for c in cves]
+
+        # Generate checklist
+        reporter = CVEReporter(store, config.kernel.root)
+        checklist = reporter.generate_backport_checklist(cve_ids, kernel_version, output)
+
+        if not output:
+            click.echo(checklist)
+
+
+@cve.command('list')
+@click.option('--severity', '-s', type=click.Choice(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
+              help='Filter by severity')
+@click.option('--limit', '-l', type=int, default=20, help='Maximum number of CVEs to show')
+@click.pass_context
+def cve_list(ctx, severity, limit):
+    """
+    List all CVEs in the database.
+
+    Examples:
+
+        kgraph cve list
+
+        kgraph cve list --severity CRITICAL
+
+        kgraph cve list -s HIGH -s CRITICAL -l 50
+    """
+    config = ctx.obj['config']
+
+    from src.module_e.impact_analyzer import CVEImpactAnalyzer
+
+    with Neo4jGraphStore(config.neo4j.url, config.neo4j.user,
+                          config.neo4j.password) as store:
+        analyzer = CVEImpactAnalyzer(store)
+
+        # Get CVEs
+        if severity:
+            cves = analyzer.get_cves_by_severity(severity)
+        else:
+            cves = analyzer.get_all_cves()
+
+        # Display
+        if cves:
+            click.echo(f"\nFound {len(cves)} CVE(s)")
+            click.echo("=" * 80)
+
+            for cve in cves[:limit]:
+                click.echo(f"\n{cve['id']}: {cve.get('affected_function', 'Unknown')}")
+                click.echo(f"  Severity: {cve.get('severity', 'UNKNOWN')} (CVSS {cve.get('cvss_score', 0)})")
+                click.echo(f"  Type: {cve.get('vulnerability_type', 'unknown')}")
+                click.echo(f"  File: {cve.get('file_path', 'Unknown')}")
+
+            if len(cves) > limit:
+                click.echo(f"\n... and {len(cves) - limit} more")
+        else:
+            click.echo("No CVEs found")
+
+
+# ==================== Version Command ====================
+
 @cli.command()
 @click.pass_context
 def version(ctx):
     """Show version information."""
-    click.echo("Kernel-GraphRAG Sentinel v0.2.0-dev")
+    click.echo("Kernel-GraphRAG Sentinel v0.4.0")
     click.echo("AI-powered Linux kernel code analysis")
     click.echo("\nv0.1.0 - Core functionality complete")
     click.echo("  ✅ Phase 1: Environment Setup")
@@ -626,11 +941,17 @@ def version(ctx):
     click.echo("  ✅ Phase 5: Impact Analysis")
     click.echo("  ✅ Phase 6: CLI Interface")
     click.echo("  ✅ Phase 7: Visualization & Documentation")
-    click.echo("\nv0.2.0-dev - Data Flow Analysis (in progress)")
+    click.echo("\nv0.2.0 - Data Flow Analysis")
     click.echo("  ✅ Module D: Variable tracking & flow analysis")
     click.echo("  ✅ Neo4j data flow ingestion")
     click.echo("  ✅ CLI commands: ingest-dataflow, dataflow")
-    click.echo("  🔄 Integration tests & documentation")
+    click.echo("\nv0.4.0 - CVE Impact Analysis")
+    click.echo("  ✅ Module E: CVE importer & parser")
+    click.echo("  ✅ CVE impact analysis engine")
+    click.echo("  ✅ Version checking & backport detection")
+    click.echo("  ✅ Test coverage analysis for CVEs")
+    click.echo("  ✅ CVE reporting & backport checklists")
+    click.echo("  ✅ CLI commands: cve import, impact, check, report, ...")
 
 
 def main():
